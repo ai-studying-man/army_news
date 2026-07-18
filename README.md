@@ -70,3 +70,10 @@ TELEGRAM_CHAT_ID=<secret>
 
 제품 범위와 안전 기준은 [PRD.md](PRD.md), 구현 순서는 [TODOLIST.md](TODOLIST.md)에
 정리되어 있습니다.
+
+## 자동 실행 운영
+
+GitHub Actions는 매일 06:30 KST(`30 21 * * *` UTC)에 예약됩니다. 예약 실행은 지연될 수
+있고 공개 저장소 활동이 오래 없으면 비활성화될 수 있습니다. Secrets 설정, 수동 dry-run,
+강제 재전송, 날짜별 중복 방지 한계와 현재 Telegram 자격 증명 인계 대기 상태는
+[운영 문서](docs/OPERATIONS.md)를 따릅니다.

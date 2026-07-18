@@ -1,0 +1,87 @@
+name: ARMY morning brief
+
+on:
+  schedule:
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: Send to Telegram instead of running a dry-run
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: army-morning-brief-delivery
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Log safe trigger type
+        run: echo "trigger=${{ github.event_name }}"
+
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+
+      - name: Install frozen dependencies
+        run: uv sync --frozen --dev
+
+      - name: Determine KST date
+        id: kst_date
+        shell: bash
+        run: |
+          kst_date="$(TZ=Asia/Seoul date +%F)"
+          echo "kst_date=${kst_date}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore exact scheduled-send marker
+        id: sent_marker
+        if: ${{ github.event_name == 'schedule' }}
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/army-morning-brief
+          key: army-morning-brief-sent-${{ steps.kst_date.outputs.kst_date }}
+
+      - name: Manual dry-run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_send == false }}
+        run: uv run --frozen python -m army_morning_brief --dry-run
+
+      - name: Send scheduled or explicitly forced briefing
+        id: send
+        if: >-
+          ${{ (github.event_name == 'schedule' &&
+          steps.sent_marker.outputs.cache-hit != 'true') ||
+          (github.event_name == 'workflow_dispatch' && inputs.force_send == true) }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: uv run --frozen python -m army_morning_brief --send
+
+      - name: Create successful scheduled-send marker
+        if: ${{ github.event_name == 'schedule' && steps.send.outcome == 'success' }}
+        shell: bash
+        run: |
+          mkdir -p .cache/army-morning-brief
+          touch ".cache/army-morning-brief/${{ steps.kst_date.outputs.kst_date }}"
+
+      - name: Save successful scheduled-send marker
+        if: ${{ github.event_name == 'schedule' && steps.send.outcome == 'success' }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .cache/army-morning-brief
+          key: army-morning-brief-sent-${{ steps.kst_date.outputs.kst_date }}

@@ -50,14 +50,14 @@
 - [ ] 자격 증명 없이 `--dry-run`이 성공하고 전송 호출이 없는 테스트 작성
 - [ ] dry-run 결과 파일과 구조화 로그 구현
 - [ ] 환경 변수 기반 Telegram 전송, 비밀 마스킹과 오류 처리 구현
-- [ ] 같은 날짜 예약 메시지 중복 방지 및 수동 실행 명시 동작 구현
+- [x] 같은 날짜 예약 메시지 중복 방지 및 수동 실행 명시 동작 구현
 
 ## 8. 자동화와 최종 검증
 
-- [ ] 06:30 KST에 해당하는 GitHub Actions cron 및 `workflow_dispatch` 작성
-- [ ] 예약/수동 실행 구분과 Secrets 이름의 정적 테스트 작성
-- [ ] `uv run pytest` 실행
-- [ ] `uv run ruff check .` 및 `uv run ruff format --check .` 실행
-- [ ] `uv run basedpyright` 실행
+- [x] 06:30 KST에 해당하는 GitHub Actions cron 및 `workflow_dispatch` 작성
+- [x] 예약/수동 실행 구분과 Secrets 이름의 정적 테스트 작성
+- [x] `uv run pytest` 실행
+- [x] `uv run ruff check .` 및 `uv run ruff format --check .` 실행
+- [x] `uv run basedpyright` 실행
 - [ ] 자격 증명 없는 로컬 dry-run 검토
 - [ ] 승인 뒤 GitHub Secrets 등록 및 Telegram 시험 전송

@@ -19,6 +19,7 @@ army-news = "army_morning_brief.cli:main"
 dev = [
   "basedpyright>=1.29,<2",
   "pytest>=8,<9",
+  "pyyaml>=6,<7",
   "ruff>=0.11,<1",
 ]
 
