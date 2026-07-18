@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>공개 일일 피드</title>
+    <item>
+      <title>8사단 장병 안전교육 실시</title>
+      <link>https://news.example.test/division-safety</link>
+      <pubDate>Fri, 17 Jul 2026 05:00:00 GMT</pubDate>
+      <description><![CDATA[<p>장병 대상 <b>안전 교육</b> &amp; 점검</p>]]></description>
+    </item>
+    <item>
+      <title>양주시 군·관 재난대응 협력</title>
+      <link>https://news.example.test/region-cooperation</link>
+      <pubDate>Fri, 17 Jul 2026 21:30:00 GMT</pubDate>
+      <description><![CDATA[양주시와 군 관계자가 공개 훈련을 점검했다.]]></description>
+    </item>
+    <item>
+      <title>시간 범위 이전 기사</title>
+      <link>https://news.example.test/too-early</link>
+      <pubDate>Fri, 17 Jul 2026 04:59:59 GMT</pubDate>
+      <description>범위 밖</description>
+    </item>
+    <item>
+      <title>시간 범위 이후 기사</title>
+      <link>https://news.example.test/too-late</link>
+      <pubDate>Fri, 17 Jul 2026 21:30:01 GMT</pubDate>
+      <description>범위 밖</description>
+    </item>
+  </channel>
+</rss>

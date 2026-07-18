@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>공개 적대 입력 피드</title>
+    <item>
+      <title>날짜 형식 오류</title>
+      <link>https://news.example.test/bad-date</link>
+      <pubDate>not-a-date</pubDate>
+      <description>이 항목만 제외한다.</description>
+    </item>
+    <item>
+      <title>중복 사건 첫 보도</title>
+      <link>https://news.example.test/duplicate-one</link>
+      <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+      <description>공개 안전행사 보도</description>
+    </item>
+    <item>
+      <title>중복 사건 재전재</title>
+      <link>https://news.example.test/duplicate-two</link>
+      <pubDate>Fri, 17 Jul 2026 08:05:00 GMT</pubDate>
+      <description>같은 공개 안전행사 보도</description>
+    </item>
+    <item>
+      <title>양주 가격 상승</title>
+      <link>https://news.example.test/homonym</link>
+      <pubDate>Fri, 17 Jul 2026 09:00:00 GMT</pubDate>
+      <description>지역명이 아닌 상품명 문맥이며 후속 분류에서 제외될 항목</description>
+    </item>
+    <item>
+      <title>HTTP 링크 거부</title>
+      <link>http://news.example.test/insecure</link>
+      <pubDate>Fri, 17 Jul 2026 10:00:00 GMT</pubDate>
+      <description>비 HTTPS</description>
+    </item>
+    <item>
+      <title>날짜 누락</title>
+      <link>https://news.example.test/no-date</link>
+      <description>발행 시각 누락</description>
+    </item>
+    <item>
+      <title><![CDATA[정상 별도 기사 <확인>]]></title>
+      <link>https://news.example.test/distinct</link>
+      <pubDate>Fri, 17 Jul 2026 11:00:00 +0000</pubDate>
+      <description><![CDATA[공개 자료 &lt;검토&gt; &amp; 후속 발표]]></description>
+    </item>
+  </channel>
+</rss>
