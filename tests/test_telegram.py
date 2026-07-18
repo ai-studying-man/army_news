@@ -193,8 +193,7 @@ def test_long_korean_emoji_html_is_split_without_content_loss_or_broken_links() 
     assert all(len(_visible_text(chunk)) <= 4096 for chunk in chunks)
     assert "".join(_visible_text(chunk) for chunk in chunks) == _visible_text(source)
     assert all(
-        chunk.count('<a href="https://example.invalid/report?x=1&amp;y=2">')
-        == chunk.count("</a>")
+        chunk.count('<a href="https://example.invalid/report?x=1&amp;y=2">') == chunk.count("</a>")
         for chunk in chunks
     )
 

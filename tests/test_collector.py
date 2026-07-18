@@ -43,9 +43,7 @@ def _client(handler: Callable[[httpx.Request], httpx.Response]) -> httpx.Client:
 
 def test_public_and_configured_sources_are_https_and_google_queries_are_encoded() -> None:
     config = BriefConfig(
-        divisions=(
-            DivisionRule("제8기동사단", ("8사단", "오뚜기부대"), ("양주", "동두천")),
-        )
+        divisions=(DivisionRule("제8기동사단", ("8사단", "오뚜기부대"), ("양주", "동두천")),)
     )
 
     url = build_google_news_url(("8사단", "오뚜기 부대"))
@@ -141,8 +139,7 @@ def test_partial_source_failure_continues_with_safe_diagnostics_and_request_poli
         request.headers["user-agent"].startswith("army-morning-brief/") for request in requests
     )
     assert all(
-        request.extensions["timeout"]
-        == {"connect": 5.0, "read": 15.0, "write": 15.0, "pool": 5.0}
+        request.extensions["timeout"] == {"connect": 5.0, "read": 15.0, "write": 15.0, "pool": 5.0}
         for request in requests
     )
 

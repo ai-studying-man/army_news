@@ -20,9 +20,7 @@ def article(title: str, description: str = "", source_name: str = "공개 뉴스
 
 
 def test_direct_division_alias_is_classified_with_highest_rank() -> None:
-    result = classify_article(
-        article("양주시 오뚜기부대 수해복구 대민지원"), BriefConfig.default()
-    )
+    result = classify_article(article("양주시 오뚜기부대 수해복구 대민지원"), BriefConfig.default())
 
     assert result is not None
     assert result.group is OutputGroup.DIVISION
@@ -47,9 +45,7 @@ def test_region_needs_configured_place_and_allowed_context(
 
 
 def test_context_is_evaluated_across_title_description_and_source() -> None:
-    config = BriefConfig(
-        divisions=(DivisionRule("별빛사단", ("별빛부대",), ("춘천",)),)
-    )
+    config = BriefConfig(divisions=(DivisionRule("별빛사단", ("별빛부대",), ("춘천",)),))
 
     result = classify_article(
         article("춘천시 협력 행사", "지역 현안을 논의했다", "육군 공식 보도자료"), config

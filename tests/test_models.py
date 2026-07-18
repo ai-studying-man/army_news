@@ -109,8 +109,10 @@ def test_config_accepts_mapping_and_environment_json_overrides() -> None:
 
     mapped = BriefConfig.from_mapping(data)
     from_environment = BriefConfig.from_env(
-        {"ARMY_BRIEF_CONFIG_JSON": '{"divisions": [{"name": "교체사단", '
-        '"aliases": ["교체부대"], "regions": ["원주"]}]}' }
+        {
+            "ARMY_BRIEF_CONFIG_JSON": '{"divisions": [{"name": "교체사단", '
+            '"aliases": ["교체부대"], "regions": ["원주"]}]}'
+        }
     )
 
     assert [rule.name for rule in mapped.divisions] == ["별빛사단", "해오름사단"]
