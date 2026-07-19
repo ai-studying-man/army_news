@@ -27,6 +27,24 @@ def test_direct_division_alias_is_classified_with_highest_rank() -> None:
     assert result.matched_term == "오뚜기부대"
 
 
+def test_general_army_alias_classifies_content_as_division() -> None:
+    result = classify_article(article("육군, AI 기반 드론 전력화 추진"), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.DIVISION
+    assert result.matched_term == "육군"
+
+
+def test_general_army_alias_does_not_override_region_context() -> None:
+    result = classify_article(
+        article("포천 산불 재난 대응", "육군 장병이 주민 안전을 지원했다"), BriefConfig.default()
+    )
+
+    assert result is not None
+    assert result.group is OutputGroup.REGION
+    assert result.matched_term == "포천"
+
+
 def test_feed_label_division_alias_does_not_override_region_flood_content() -> None:
     result = classify_article(
         article(

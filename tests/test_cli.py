@@ -38,14 +38,39 @@ def test_c001_daily_fixture_dry_run_renders_expected_briefing(
     captured = capsys.readouterr()
     assert result == 0
     assert captured.err == ""
-    assert "2026.07.18" in captured.out
-    assert "[사단]" in captured.out
-    assert "[지역]" in captured.out
-    assert "8사단 장병 안전교육 실시" in captured.out
-    assert "양주시 군·관 재난대응 협력" in captured.out
-    assert 'href="https://news.example.test/division-safety"' in captured.out
-    assert 'href="https://news.example.test/region-cooperation"' in captured.out
+    assert "■ [사단] 8사단 장병 안전교육 실시 (공개 언론사)" in captured.out
+    assert "https://news.example.test/division-safety" in captured.out
+    assert "- 장병 대상 안전 교육 &amp; 점검" in captured.out
+    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)" in captured.out
+    assert "https://news.example.test/region-cooperation" in captured.out
+    assert "- 양주시와 군 관계자가 공개 훈련을 점검했다." in captured.out
+    assert "<b>" not in captured.out
+    assert "출처:" not in captured.out
+    assert "발행:" not in captured.out
+    assert "원문 기사" not in captured.out
+    assert "1." not in captured.out
     assert "too-early" not in captured.out
+    assert "too-late" not in captured.out
+
+
+def test_delayed_run_keeps_fixed_0500_cutoff_and_boundary_region_article(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _clean_environment(monkeypatch)
+
+    result = cli.main(
+        [
+            "--fixture",
+            _fixture("daily_feed.xml"),
+            "--dry-run",
+            "--now",
+            "2026-07-18T08:17:00+09:00",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)" in captured.out
     assert "too-late" not in captured.out
 
 
@@ -127,7 +152,7 @@ def test_live_dry_run_uses_collection_window_and_safe_diagnostic_codes(
     assert len(seen) == 1
     window = seen[0][1]
     assert window.start.isoformat() == "2026-07-17T14:00:00+09:00"
-    assert window.end.isoformat() == NOW
+    assert window.end.isoformat() == "2026-07-18T05:00:00+09:00"
     assert captured.err == "source diagnostic: request_failed\n"
     assert "PRIVATE" not in captured.err
     assert "token-value" not in captured.err

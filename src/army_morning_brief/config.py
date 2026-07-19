@@ -60,7 +60,7 @@ class BriefConfig:
             divisions=(
                 DivisionRule(
                     name="제8기동사단",
-                    aliases=("8사단", "8기동사단", "3070부대", "오뚜기부대"),
+                    aliases=("육군", "8사단", "8기동사단", "3070부대", "오뚜기부대"),
                     regions=("양주", "동두천", "포천", "연천", "의정부"),
                 ),
             )
@@ -129,7 +129,8 @@ class CollectionWindow:
 
 def kst_collection_window(run_at: datetime) -> CollectionWindow:
     _require_aware(run_at, "run_at")
-    end = run_at.astimezone(KST)
-    previous_day = end.date() - timedelta(days=1)
+    run_date = run_at.astimezone(KST).date()
+    previous_day = run_date - timedelta(days=1)
     start = datetime.combine(previous_day, time(hour=14), tzinfo=KST)
+    end = datetime.combine(run_date, time(hour=5), tzinfo=KST)
     return CollectionWindow(start=start, end=end)

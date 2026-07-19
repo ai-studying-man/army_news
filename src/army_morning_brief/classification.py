@@ -76,15 +76,23 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
     if any(term.casefold() in context for term in _SENSITIVE_TERMS):
         return None
 
+    general_army_aliases: list[str] = []
     for rule in config.divisions:
         for alias in rule.aliases:
-            if alias.casefold() in context:
+            if alias.casefold() == "육군":
+                general_army_aliases.append(alias)
+            elif alias.casefold() in context:
                 return ClassificationResult(group=OutputGroup.DIVISION, matched_term=alias)
 
-    if not any(term.casefold() in context for term in _REGION_CONTEXT_TERMS):
-        return None
-    for rule in config.divisions:
-        for region in rule.regions:
-            if region.casefold() in context:
-                return ClassificationResult(group=OutputGroup.REGION, matched_term=region)
+    if any(term.casefold() in context for term in _REGION_CONTEXT_TERMS):
+        for rule in config.divisions:
+            for region in rule.regions:
+                if region.casefold() in context:
+                    return ClassificationResult(group=OutputGroup.REGION, matched_term=region)
+
+    if general_army_aliases and any(alias.casefold() in context for alias in general_army_aliases):
+        return ClassificationResult(
+            group=OutputGroup.DIVISION,
+            matched_term=general_army_aliases[0],
+        )
     return None

@@ -64,15 +64,25 @@ def test_article_rejects_naive_published_time() -> None:
         )
 
 
-def test_kst_window_starts_at_previous_day_1400_and_ends_at_actual_run_time() -> None:
-    run_at = datetime(2026, 7, 18, 8, 17, tzinfo=KST)
+@pytest.mark.parametrize(
+    "run_at",
+    [
+        datetime(2026, 7, 18, 6, 30, tzinfo=KST),
+        datetime(2026, 7, 18, 8, 17, tzinfo=KST),
+    ],
+)
+def test_kst_window_uses_fixed_0500_cutoff_for_scheduled_and_delayed_runs(
+    run_at: datetime,
+) -> None:
     window = kst_collection_window(run_at)
 
     assert window.start == datetime(2026, 7, 17, 14, 0, tzinfo=KST)
-    assert window.end == run_at
+    assert window.end == datetime(2026, 7, 18, 5, 0, tzinfo=KST)
     assert window.contains(datetime(2026, 7, 17, 14, 0, tzinfo=KST))
     assert not window.contains(datetime(2026, 7, 17, 13, 59, 59, 999999, tzinfo=KST))
-    assert window.contains(run_at)
+    assert window.contains(datetime(2026, 7, 18, 5, 0, tzinfo=KST))
+    assert not window.contains(datetime(2026, 7, 18, 5, 0, 0, 1, tzinfo=KST))
+    assert not window.contains(run_at)
 
 
 def test_kst_window_converts_an_aware_non_kst_run_time() -> None:
@@ -80,7 +90,7 @@ def test_kst_window_converts_an_aware_non_kst_run_time() -> None:
     window = kst_collection_window(run_at_utc)
 
     assert window.start == datetime(2026, 7, 17, 14, 0, tzinfo=KST)
-    assert window.end == datetime(2026, 7, 18, 6, 30, tzinfo=KST)
+    assert window.end == datetime(2026, 7, 18, 5, 0, tzinfo=KST)
 
 
 def test_window_rejects_naive_run_and_candidate_times() -> None:
@@ -95,7 +105,7 @@ def test_window_rejects_naive_run_and_candidate_times() -> None:
 def test_default_config_uses_prompt_aliases_and_regions() -> None:
     rule = BriefConfig.default().divisions[0]
 
-    assert rule.aliases == ("8사단", "8기동사단", "3070부대", "오뚜기부대")
+    assert rule.aliases == ("육군", "8사단", "8기동사단", "3070부대", "오뚜기부대")
     assert rule.regions == ("양주", "동두천", "포천", "연천", "의정부")
 
 

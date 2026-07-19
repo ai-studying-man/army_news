@@ -28,7 +28,7 @@ KST = timezone(timedelta(hours=9))
 FIXTURES = Path(__file__).parent / "fixtures"
 WINDOW = CollectionWindow(
     start=datetime(2026, 7, 17, 14, 0, tzinfo=KST),
-    end=datetime(2026, 7, 18, 6, 30, tzinfo=KST),
+    end=datetime(2026, 7, 18, 5, 0, tzinfo=KST),
 )
 SOURCE = Source("fixture", "https://feeds.example.test/daily.xml", priority=10)
 
