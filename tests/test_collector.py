@@ -66,7 +66,7 @@ def test_public_and_configured_sources_are_https_and_google_queries_are_encoded(
     assert all_sources[: len(PUBLIC_RSS_SOURCES)] == PUBLIC_RSS_SOURCES
 
 
-def test_daily_fixture_accepts_inclusive_boundaries_and_normalizes_description() -> None:
+def test_daily_fixture_preserves_item_publisher_metadata() -> None:
     articles = parse_rss(_fixture("daily_feed.xml"), SOURCE, WINDOW)
 
     assert [article.title for article in articles] == [
@@ -77,7 +77,41 @@ def test_daily_fixture_accepts_inclusive_boundaries_and_normalizes_description()
     assert articles[0].published_at == WINDOW.start
     assert articles[1].published_at == WINDOW.end
     assert articles[0].description == "장병 대상 안전 교육 & 점검"
-    assert all(article.source is SOURCE for article in articles)
+    assert articles[0].url == "https://news.example.test/division-safety"
+    assert articles[0].source == Source(
+        name="공개 언론사",
+        url="https://publisher.example.test/",
+        priority=SOURCE.priority,
+    )
+    assert articles[1].source is SOURCE
+
+
+@pytest.mark.parametrize(
+    "publisher",
+    [
+        "",
+        '<source url="https://publisher.example.test/"></source>',
+        '<source url="not-a-url">공개 언론사</source>',
+        '<source url="http://publisher.example.test/">공개 언론사</source>',
+    ],
+)
+def test_invalid_or_incomplete_item_publisher_falls_back_to_feed_source(
+    publisher: str,
+) -> None:
+    document = f"""\
+<rss version="2.0"><channel><item>
+  <title>공개 기사</title>
+  <link>https://news.google.com/rss/articles/public-test-token</link>
+  <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+  {publisher}
+</item></channel></rss>
+""".encode()
+
+    articles = parse_rss(document, SOURCE, WINDOW)
+
+    assert len(articles) == 1
+    assert articles[0].source is SOURCE
+    assert articles[0].url == "https://news.google.com/rss/articles/public-test-token"
 
 
 def test_adversarial_items_are_isolated_without_filtering_valid_homonyms_or_duplicates() -> None:

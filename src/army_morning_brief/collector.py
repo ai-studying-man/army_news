@@ -103,6 +103,23 @@ def _is_https_url(value: str) -> bool:
     return parsed.scheme.lower() == "https" and bool(parsed.netloc)
 
 
+def _article_source(item: ElementTree.Element, feed_source: Source) -> Source:
+    publisher = next(
+        (child for child in item if _local_name(child.tag) == "source"),
+        None,
+    )
+    if publisher is None:
+        return feed_source
+    name = _visible_text("".join(publisher.itertext()).strip())
+    url = (publisher.get("url") or "").strip()
+    if not name or not _is_https_url(url):
+        return feed_source
+    try:
+        return Source(name=name, url=url, priority=feed_source.priority)
+    except ValueError:
+        return feed_source
+
+
 def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Article, ...]:
     if len(xml) > MAX_FEED_BYTES:
         raise FeedTooLargeError("RSS document exceeds size limit")
@@ -135,7 +152,7 @@ def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Art
                     description=description,
                     url=url,
                     published_at=published_at,
-                    source=source,
+                    source=_article_source(item, source),
                     feed_rank=feed_rank,
                 )
             )
