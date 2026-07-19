@@ -15,8 +15,27 @@ or Army context to be confirmed.
 
 ## Local dry-run
 
-Use Python 3.12 and the lock file. This collects only configured public HTTPS sources and prints the
-briefing without calling Telegram.
+Use Python 3.12 and the lock file. This collects only the code-reviewed public HTTPS sources and
+prints the briefing without calling Telegram. Division names, aliases, and regions may be replaced
+without a code change through `ARMY_BRIEF_CONFIG_JSON`:
+
+```json
+{
+  "divisions": [
+    {
+      "name": "제8기동사단",
+      "aliases": ["육군", "8사단", "8기동사단", "3070부대", "오뚜기부대"],
+      "regions": ["양주", "동두천", "포천", "연천", "의정부"]
+    }
+  ]
+}
+```
+
+The same object is accepted by `BriefConfig.from_mapping` and `BriefConfig.from_env`; malformed
+JSON, empty strings, and duplicate aliases fail validation. Source URLs and priorities are not
+environment-configurable in this release. The initial list is explicitly code-reviewed in
+`src/army_morning_brief/sources.py`: 국방부 보도자료 (100), 국방부 공지사항 (80), Google News
+RSS for division aliases (60), and Google News RSS for regions (40).
 
 ```powershell
 uv sync --frozen --dev
@@ -25,6 +44,11 @@ uv run --frozen python -m army_morning_brief --dry-run
 
 Do not add private, authenticated, operational, location, movement, strength, or deployment sources.
 Review dry-run output for public-source safety before enabling delivery.
+
+Collection is bounded and failure-isolated: transient HTTP/transport errors retry at most twice per
+source, with a 60-second source budget and capped backoff. The pipeline canonicalizes URLs and uses
+event anchors to retain one representative original per incident while keeping distinct state,
+country, region, and training/safety events separate.
 
 ## GitHub setup and manual runs
 
@@ -55,7 +79,8 @@ step and are never command-line arguments.
 ## Message format and duplicate handling
 
 Keep only the representative original article for each incident; do not send syndicated duplicates.
-Each item is exactly three lines, with a blank line between items:
+Each item is exactly three logical lines, with a blank line between items. Telegram HTML renders the
+HTTPS URL line as an escaped clickable `<a href="…">…</a>` link:
 
 ```text
 ■ [사단] 기사 제목 (신문명)
