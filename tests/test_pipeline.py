@@ -159,6 +159,42 @@ def test_event_dedup_collapses_near_duplicate_rewrite_to_best_representative() -
     assert selected[OutputGroup.DIVISION][0].article is preferred_rewrite
 
 
+def test_live_style_training_and_flood_rewrites_collapse_but_different_unit_remains() -> None:
+    items = (
+        article(
+            "육군 제6보병사단, 20~23일 철원·포천서 전투지휘검열 훈련 실시",
+            url="https://one.example/6div-training",
+            priority=10,
+        ),
+        article(
+            "육군 3사단, 철원 일대서 전투지휘검열 훈련",
+            url="https://two.example/3div-training",
+        ),
+        article(
+            "육군 제6보병사단, 철원~포천 일대서 23일까지 전투 지휘검열 훈련",
+            url="https://three.example/6div-training-rewrite",
+        ),
+        article(
+            "포천 하천 범람으로 캠핑객 97명 고립…산길 우회로로 전원 대피",
+            url="https://four.example/flood",
+            priority=10,
+        ),
+        article(
+            "집중호우에 옹벽 붕괴 포천 캠핑객 95명 고립",
+            url="https://five.example/flood-update",
+        ),
+    )
+
+    selected = select_articles(items, CONFIG)
+    selected_urls = {item.article.url for group_items in selected.values() for item in group_items}
+
+    assert selected_urls == {
+        "https://one.example/6div-training",
+        "https://two.example/3div-training",
+        "https://four.example/flood",
+    }
+
+
 @pytest.mark.parametrize(
     (
         "left_views",

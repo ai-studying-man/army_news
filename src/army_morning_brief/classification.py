@@ -18,6 +18,7 @@ _FALSE_POSITIVE_TERMS = (
     "인사청문회",
     "관련주",
     "주가",
+    "육군청년위원회",
 )
 
 _SENSITIVE_TERMS = (

@@ -57,12 +57,12 @@ def _daily_quote(run_date: date) -> str:
     return _DAILY_QUOTES[run_date.toordinal() % len(_DAILY_QUOTES)]
 
 
-def extractive_summary(selected: SelectedArticle) -> str:
+def extractive_summary(selected: SelectedArticle) -> str | None:
     description = _normalized_text(selected.article.description)
     if not description:
-        return _normalized_text(selected.article.title)
+        return None
     if _is_redundant_description(selected, description):
-        return "세부 내용은 원문 기사에서 확인하세요."
+        return None
     sentences = [match.group(0).strip() for match in _SENTENCE_PATTERN.finditer(description)]
     return sentences[0] if sentences else description
 
@@ -89,20 +89,16 @@ def render_briefing_html(
             blocks.append(f"{_DIVIDER}\n{heading}\n관련 기사 없음")
             continue
         items_blocks: list[str] = []
-        for number, selected in enumerate(items, start=1):
+        for selected in items:
             article = selected.article
             title = escape(_normalized_text(article.title))
             url = _normalized_text(article.url)
             escaped_url = escape(url, quote=True)
-            summary = escape(_normalized_text(extractive_summary(selected)))
-            items_blocks.append(
-                "\n".join(
-                    (
-                        f"{number}. {title}",
-                        f"   ✅실무 참고 : {summary}",
-                        f'   🔗<a href="{escaped_url}">뉴스 기사 링크 바로가기</a>',
-                    )
-                )
-            )
+            summary = extractive_summary(selected)
+            item_lines = [title]
+            if summary is not None:
+                item_lines.append(f"✅실무 참고 : {escape(_normalized_text(summary))}")
+            item_lines.append(f'🔗<a href="{escaped_url}">뉴스 기사 링크 바로가기</a>')
+            items_blocks.append("\n".join(item_lines))
         blocks.append(f"{_DIVIDER}\n{heading}\n{'\n\n'.join(items_blocks)}")
     return f"{header}\n\n{'\n\n'.join(blocks)}"

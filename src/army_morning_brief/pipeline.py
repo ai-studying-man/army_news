@@ -43,6 +43,16 @@ _STATE_DIMENSIONS = (
 )
 _WORD_PATTERN = re.compile(r"[0-9a-zA-Z가-힣]+")
 _NUMBER_PATTERN = re.compile(r"\d+")
+_DIVISION_NUMBER_PATTERN = re.compile(r"(?:제\s*)?(\d+)\s*(?:보병|기동)?사단")
+_VOLATILE_COUNT_TERMS = (
+    "고립",
+    "대피",
+    "피해",
+    "사망",
+    "부상",
+    "실종",
+    "캠핑객",
+)
 _EVENT_BOILERPLATE_TERMS = frozenset(
     {
         "관련",
@@ -204,6 +214,11 @@ def _has_distinct_dimensions(left: Article, right: Article, config: BriefConfig)
         if left_state is not None and right_state is not None and left_state != right_state:
             return True
 
+    left_divisions = set(_DIVISION_NUMBER_PATTERN.findall(left_text))
+    right_divisions = set(_DIVISION_NUMBER_PATTERN.findall(right_text))
+    if left_divisions and right_divisions and left_divisions.isdisjoint(right_divisions):
+        return True
+
     left_training_state = 1 if any(term in left_text for term in ("사고", "부상", "사망")) else 0
     right_training_state = 1 if any(term in right_text for term in ("사고", "부상", "사망")) else 0
     if left_training_state != right_training_state and (
@@ -213,6 +228,8 @@ def _has_distinct_dimensions(left: Article, right: Article, config: BriefConfig)
 
     left_numbers = set(_NUMBER_PATTERN.findall(left_text))
     right_numbers = set(_NUMBER_PATTERN.findall(right_text))
+    if any(term in left_text or term in right_text for term in _VOLATILE_COUNT_TERMS):
+        return False
     return bool(left_numbers and right_numbers and left_numbers.isdisjoint(right_numbers))
 
 
@@ -223,8 +240,15 @@ def _same_event(left: Article, right: Article, config: BriefConfig) -> bool:
         return False
     left_anchors = _meaningful_terms(left, config)
     right_anchors = _meaningful_terms(right, config)
-    if not left_anchors or not right_anchors or left_anchors.isdisjoint(right_anchors):
+    shared_anchors = left_anchors & right_anchors
+    if not shared_anchors:
         return False
+    if len(shared_anchors) >= 3:
+        return True
+    if len(shared_anchors) >= 2 and all(
+        any(term in text for term in _VOLATILE_COUNT_TERMS) for text in (_text(left), _text(right))
+    ):
+        return True
     word_overlap = _overlap(_terms(left), _terms(right))
     ngram_overlap = _overlap(_ngrams(left), _ngrams(right))
     return word_overlap >= 0.72 or ngram_overlap >= 0.76

@@ -95,6 +95,15 @@ def test_personal_army_nostalgia_is_not_division_news() -> None:
     )
 
 
+def test_foreign_army_youth_committee_translation_is_not_korean_army_news() -> None:
+    title = (
+        "육군청년위원회는 캄보디아 교환 프로그램에 참가할 젊은 장교 대표단을 "
+        "준비시키기 위한 훈련을 제공하고 있습니다."
+    )
+
+    assert classify_article(article(title), BriefConfig.default()) is None
+
+
 def test_general_army_alias_does_not_override_region_context() -> None:
     result = classify_article(
         article("포천 산불 재난 대응", "육군 장병이 주민 안전을 지원했다"), BriefConfig.default()

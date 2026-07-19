@@ -100,9 +100,9 @@ YYYY.MM.DD.(요일)
 
 ------------------------------------
 🪖 육군&8사단 주요 뉴스
-1. 기사 제목
-   ✅실무 참고 : 한 줄 요약
-   🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
+기사 제목
+✅실무 참고 : 한 줄 요약
+🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
 
 ------------------------------------
 📍 지역 뉴스
@@ -110,9 +110,8 @@ YYYY.MM.DD.(요일)
 
 ------------------------------------
 🌐 외교/북한 관련
-1. 기사 제목
-   ✅실무 참고 : 한 줄 요약
-   🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
+기사 제목
+🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
 ```
 
 ## Duplicate guard and delivery limits
