@@ -95,13 +95,16 @@ uv run python -m army_morning_brief --dry-run
 ```
 
 dry-run은 빈 `.env`로 검토하고, 실제 운영 값은 검토 후 GitHub Actions Secrets에 아래
-이름으로만 등록합니다. 두 값은 모두 GitHub Secrets로 관리하며, 실제 값은 문서·코드·로그·
+이름으로만 등록합니다. 세 값은 모두 GitHub Secrets로 관리하며, 실제 값은 문서·코드·로그·
 커밋에 절대 남기지 않습니다. 채팅에 노출된 토큰은 운영 전 반드시 폐기·회전합니다.
-`chat_id`가 없으면 실제 전송을 시작하지 않습니다.
+`TELEGRAM_CHAT_ID`는 기존 개인 대화 수신자이고 `TELEGRAM_CHANNEL_ID`는 브로드캐스트 채널
+수신자입니다. 전송 단계는 두 수신자 ID를 쉼표로 결합해 동일한 브리핑을 두 곳에 순서대로
+보냅니다. 두 수신자 ID가 없으면 실제 전송을 시작하지 않습니다.
 
 ```text
 TELEGRAM_BOT_TOKEN=<secret>
 TELEGRAM_CHAT_ID=<secret>
+TELEGRAM_CHANNEL_ID=<secret>
 ```
 
 ## Telegram 항목 형식

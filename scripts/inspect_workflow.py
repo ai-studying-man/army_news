@@ -14,7 +14,8 @@ DEFAULT_WORKFLOW = Path(".github/workflows/army-morning-brief.yml")
 ACTION_PATTERN = re.compile(
     r"uses:\s+(?P<action>[^@\s]+)@(?P<sha>[0-9a-f]{40})\s+#\s+(?P<release>v\S+)"
 )
-SECRET_NAMES = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
+SECRET_NAMES = ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "TELEGRAM_CHANNEL_ID")
+RECIPIENT_EXPRESSION = "${{ secrets.TELEGRAM_CHAT_ID }},${{ secrets.TELEGRAM_CHANNEL_ID }}"
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -101,7 +102,11 @@ def inspect_workflow(path: Path) -> dict[str, object]:
         step
         for step in steps
         if isinstance(step.get("env"), dict)
-        and any(name in _mapping(step["env"]) for name in SECRET_NAMES)
+        and any(
+            name in key or name in str(value)
+            for key, value in _mapping(step["env"]).items()
+            for name in SECRET_NAMES
+        )
     ]
     all_commands = "\n".join(str(step.get("run", "")) for step in steps)
     restore_index = steps.index(restore)
@@ -166,7 +171,11 @@ def inspect_workflow(path: Path) -> dict[str, object]:
             "names": list(SECRET_NAMES),
             "only_on_send_step": secret_steps == [send]
             and _mapping(send.get("env"))
-            == {name: f"${{{{ secrets.{name} }}}}" for name in SECRET_NAMES},
+            == {
+                "TELEGRAM_BOT_TOKEN": "${{ secrets.TELEGRAM_BOT_TOKEN }}",
+                "TELEGRAM_CHAT_ID": RECIPIENT_EXPRESSION,
+            },
+            "recipient_expression": _mapping(send.get("env")).get("TELEGRAM_CHAT_ID"),
         },
         "trigger": {
             "safe_log": str(safe_log.get("run", ""))

@@ -80,8 +80,15 @@ def test_c003_workflow_contract_is_pinned_safe_and_duplicate_guarded() -> None:
         "permissions": {"contents": "read"},
         "secrets": {
             "command_arguments": False,
-            "names": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"],
+            "names": [
+                "TELEGRAM_BOT_TOKEN",
+                "TELEGRAM_CHAT_ID",
+                "TELEGRAM_CHANNEL_ID",
+            ],
             "only_on_send_step": True,
+            "recipient_expression": (
+                "${{ secrets.TELEGRAM_CHAT_ID }},${{ secrets.TELEGRAM_CHANNEL_ID }}"
+            ),
         },
         "trigger": {
             "safe_log": "trigger=${{ github.event_name }}",

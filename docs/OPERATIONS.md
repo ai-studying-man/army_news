@@ -53,15 +53,18 @@ country, region, and training/safety events separate.
 ## GitHub setup and manual runs
 
 Add these repository or environment secrets in GitHub Settings > Secrets and variables > Actions.
-Both values are GitHub Secrets; never commit a bot token or chat ID to this repository:
+All three values are GitHub Secrets; never commit a bot token or recipient ID to this repository:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
+- `TELEGRAM_CHANNEL_ID`
 
 Credential handoff is currently pending: this change has not written or validated Telegram
-credentials. No real send is allowed until `TELEGRAM_CHAT_ID` exists. If a token is exposed in chat,
-revoke and rotate it before production. After an authorized operator adds the rotated secrets, first
-run a manual dry-run:
+credentials. `TELEGRAM_CHAT_ID` preserves the existing private-chat recipient and
+`TELEGRAM_CHANNEL_ID` adds the broadcast-channel recipient. The send step combines both IDs as a
+comma-separated value and delivers the same briefing to both recipients in order. No real send is
+allowed until both recipient secrets exist. If a token is exposed in chat, revoke and rotate it
+before production. After an authorized operator adds the rotated secrets, first run a manual dry-run:
 
 ```powershell
 gh workflow run army-morning-brief.yml -f force_send=false
