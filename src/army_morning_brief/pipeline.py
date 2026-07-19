@@ -43,6 +43,70 @@ _STATE_DIMENSIONS = (
 )
 _WORD_PATTERN = re.compile(r"[0-9a-zA-Z가-힣]+")
 _NUMBER_PATTERN = re.compile(r"\d+")
+_EVENT_BOILERPLATE_TERMS = frozenset(
+    {
+        "관련",
+        "소식",
+        "기사",
+        "보도",
+        "내용",
+        "공개",
+        "장병",
+        "부대",
+        "사단",
+        "육군",
+        "군",
+        "군인",
+        "대상",
+        "행사",
+        "실시",
+        "진행",
+        "개최",
+        "참석",
+        "참여",
+        "발표",
+        "전해",
+        "밝혀",
+        "알려",
+        "추진",
+        "마련",
+        "예정",
+        "계획",
+        "위해",
+        "통해",
+        "따라",
+        "대해",
+    }
+)
+_KOREAN_PARTICLE_SUFFIXES = (
+    "으로",
+    "에서",
+    "에게",
+    "부터",
+    "까지",
+    "을",
+    "를",
+    "은",
+    "는",
+    "이",
+    "가",
+    "에",
+    "의",
+)
+_KOREAN_SENTENCE_SUFFIXES = (
+    "했다",
+    "한다",
+    "하며",
+    "하고",
+    "하여",
+    "되는",
+    "됐다",
+    "된",
+    "한",
+    "할",
+    "하는",
+    "함",
+)
 
 
 def _canonical_url(url: str) -> str:
@@ -64,6 +128,41 @@ def _text(article: Article) -> str:
 
 def _terms(article: Article) -> set[str]:
     return set(_WORD_PATTERN.findall(_text(article)))
+
+
+def _normalize_term(term: str) -> str:
+    normalized = term.casefold()
+    for suffix in _KOREAN_SENTENCE_SUFFIXES:
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+    for suffix in _KOREAN_PARTICLE_SUFFIXES:
+        if normalized.endswith(suffix) and len(normalized) > len(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
+    return normalized
+
+
+def _is_entity_term(term: str, config: BriefConfig) -> bool:
+    entity_values = (*_COUNTRIES, *(alias for rule in config.divisions for alias in rule.aliases))
+    entity_values += tuple(region for rule in config.divisions for region in rule.regions)
+    return any(value.casefold() in term for value in entity_values)
+
+
+def _meaningful_terms(article: Article, config: BriefConfig) -> set[str]:
+    """Return subject/event anchors, excluding shared entities and news boilerplate."""
+    meaningful: set[str] = set()
+    for term in _terms(article):
+        normalized = _normalize_term(term)
+        if (
+            not normalized
+            or normalized.isdigit()
+            or normalized in _EVENT_BOILERPLATE_TERMS
+            or _is_entity_term(normalized, config)
+        ):
+            continue
+        meaningful.add(normalized)
+    return meaningful
 
 
 def _ngrams(article: Article, size: int = 3) -> set[str]:
@@ -121,6 +220,10 @@ def _same_event(left: Article, right: Article, config: BriefConfig) -> bool:
     if _canonical_url(left.url) == _canonical_url(right.url):
         return True
     if _has_distinct_dimensions(left, right, config):
+        return False
+    left_anchors = _meaningful_terms(left, config)
+    right_anchors = _meaningful_terms(right, config)
+    if not left_anchors or not right_anchors or left_anchors.isdisjoint(right_anchors):
         return False
     word_overlap = _overlap(_terms(left), _terms(right))
     ngram_overlap = _overlap(_ngrams(left), _ngrams(right))

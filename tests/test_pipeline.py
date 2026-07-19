@@ -103,6 +103,49 @@ def test_event_dedup_collapses_different_outlets_and_ranks_all_fields() -> None:
     assert [item.article.source.name for item in selected[OutputGroup.REGION]] == ["높은우선순위"]
 
 
+def test_event_dedup_keeps_distinct_ordinary_army_events() -> None:
+    candidates = (
+        article(
+            "8사단 장병 안전교육 실시",
+            description="8사단 육군 관련 소식: 장병 공개 행사를 실시했다.",
+            url="https://one.example/safety-training",
+        ),
+        article(
+            "8사단 장병 전투훈련 실시",
+            description="8사단 육군 관련 소식: 장병 공개 행사를 실시했다.",
+            url="https://two.example/combat-training",
+        ),
+    )
+
+    selected = select_articles(candidates, CONFIG)
+
+    assert sum(map(len, selected.values())) == 2
+    assert {item.article.url for group_items in selected.values() for item in group_items} == {
+        "https://one.example/safety-training",
+        "https://two.example/combat-training",
+    }
+
+
+def test_event_dedup_collapses_near_duplicate_rewrite_to_best_representative() -> None:
+    less_preferred = article(
+        "8사단 장병 안전교육 실시",
+        description="8사단 장병 안전교육을 진행했다.",
+        url="https://one.example/safety-training",
+        priority=1,
+    )
+    preferred_rewrite = article(
+        "8사단, 장병 대상 안전교육 진행",
+        description="장병 대상 안전교육을 진행했다.",
+        url="https://two.example/safety-training-rewrite",
+        priority=10,
+    )
+
+    selected = select_articles((less_preferred, preferred_rewrite), CONFIG)
+
+    assert sum(map(len, selected.values())) == 1
+    assert selected[OutputGroup.DIVISION][0].article is preferred_rewrite
+
+
 @pytest.mark.parametrize(
     (
         "left_views",
