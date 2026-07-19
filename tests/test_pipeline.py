@@ -50,6 +50,19 @@ def test_pipeline_pins_existing_division_region_and_rejection_classification() -
     ]
 
 
+def test_pipeline_includes_diplomacy_north_korea_group() -> None:
+    item = article(
+        "평양서 열린 북중 정상회담",
+        url="https://news.example/diplomacy",
+    )
+
+    selected = select_articles((item,), CONFIG)
+
+    assert [entry.article.url for entry in selected[OutputGroup.DIPLOMACY_NORTH_KOREA]] == [
+        "https://news.example/diplomacy"
+    ]
+
+
 def test_global_dedup_uses_canonical_url_and_best_representative() -> None:
     less_preferred = article(
         "포천 산불 현장에 육군 장병 투입",

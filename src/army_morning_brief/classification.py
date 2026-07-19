@@ -178,6 +178,59 @@ _ARMY_WORK_TERMS = (
 _PERSONAL_NOSTALGIA_CUES = ("배우", "가수", "연예인", "방송인", "아이돌", "탤런트")
 _PERSONAL_NOSTALGIA_TERMS = ("복무 시절", "군 시절", "회상", "추억")
 
+_NORTH_KOREA_TERMS = (
+    "북한",
+    "북핵",
+    "김정은",
+    "평양",
+    "조선노동당",
+    "북한군",
+    "북중",
+    "북러",
+    "북중러",
+    "dmz",
+    "비무장지대",
+    "대남",
+    "방사포",
+    "北",
+)
+
+_STRONG_DIPLOMACY_SECURITY_TERMS = (
+    "한미동맹",
+    "한미일",
+    "국방수권법",
+    "호르무즈",
+    "k방산",
+    "방산 수출",
+    "핵심광물 공급망",
+)
+
+_FOREIGN_RELATION_TERMS = (
+    "미국",
+    "美",
+    "중국",
+    "中",
+    "러시아",
+    "이란",
+    "나토",
+    "nato",
+    "유럽",
+    "eu",
+)
+
+_DIPLOMACY_SECURITY_CONTEXT_TERMS = (
+    "외교",
+    "동맹",
+    "정상회담",
+    "제재",
+    "공습",
+    "군사 협력",
+    "군사협력",
+    "안보 협력",
+    "안보협력",
+    "핵시설",
+)
+
 _PARTICLE_SUFFIXES = (
     "으로부터",
     "에게서",
@@ -227,6 +280,7 @@ _REGION_ADMIN_SUFFIX_PATTERN = "(?:" + "|".join(_REGION_ADMIN_SUFFIXES) + ")?"
 class OutputGroup(StrEnum):
     DIVISION = "사단"
     REGION = "지역"
+    DIPLOMACY_NORTH_KOREA = "외교·북한"
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +351,39 @@ def _classify_region(context: str, config: BriefConfig) -> ClassificationResult 
     return ClassificationResult(group=OutputGroup.REGION, matched_term=region_match)
 
 
+def _classify_diplomacy_north_korea(context: str) -> ClassificationResult | None:
+    north_korea_match = next(
+        (term for term in _NORTH_KOREA_TERMS if _contains_token(context, term)),
+        None,
+    )
+    if north_korea_match is not None:
+        return ClassificationResult(
+            group=OutputGroup.DIPLOMACY_NORTH_KOREA,
+            matched_term=north_korea_match,
+        )
+
+    strong_match = next(
+        (term for term in _STRONG_DIPLOMACY_SECURITY_TERMS if term.casefold() in context),
+        None,
+    )
+    if strong_match is not None:
+        return ClassificationResult(
+            group=OutputGroup.DIPLOMACY_NORTH_KOREA,
+            matched_term=strong_match,
+        )
+
+    foreign_match = next(
+        (term for term in _FOREIGN_RELATION_TERMS if _contains_token(context, term)),
+        None,
+    )
+    if foreign_match is not None and _contains_any_stem(context, _DIPLOMACY_SECURITY_CONTEXT_TERMS):
+        return ClassificationResult(
+            group=OutputGroup.DIPLOMACY_NORTH_KOREA,
+            matched_term=foreign_match,
+        )
+    return None
+
+
 def classify_article(article: Article, config: BriefConfig) -> ClassificationResult | None:
     context = " ".join((article.title, article.description)).casefold()
     if any(term.casefold() in context for term in _FALSE_POSITIVE_TERMS):
@@ -326,6 +413,10 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
     region_result = _classify_region(context, config)
     if region_result is not None:
         return region_result
+
+    diplomacy_result = _classify_diplomacy_north_korea(context)
+    if diplomacy_result is not None:
+        return diplomacy_result
 
     if (
         general_army_aliases

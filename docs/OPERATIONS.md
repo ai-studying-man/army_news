@@ -80,15 +80,15 @@ step and are never command-line arguments.
 
 Keep only the representative original article for each incident; do not send syndicated duplicates.
 Each item is exactly three logical lines, with a blank line between items. Telegram HTML renders the
-HTTPS URL line as an escaped clickable `<a href="…">…</a>` link:
+HTTPS URL line as a short clickable `기사 링크 바로가기` link:
 
 ```text
 ■ [사단] 기사 제목 (신문명)
-기사 URL
+기사 링크 바로가기
 - 한두문장으로 기사 요약
 ```
 
-Use `[지역]` instead of `[사단]` for a regional item.
+Use `[지역]` for a regional item and `[외교·북한]` for diplomacy or North Korea coverage.
 
 ## Duplicate guard and delivery limits
 

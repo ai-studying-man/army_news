@@ -20,6 +20,37 @@ PUBLIC_RSS_SOURCES: tuple[Source, ...] = (
     ),
 )
 
+NORTH_KOREA_SEARCH_TERMS = (
+    "북한",
+    "북핵",
+    "김정은",
+    "평양",
+    "조선노동당",
+    "북한군",
+    "북중",
+    "북러",
+    "북중러",
+    "DMZ",
+    "비무장지대",
+    "대남",
+    "방사포",
+)
+
+DIPLOMACY_SECURITY_SEARCH_TERMS = (
+    "한미동맹",
+    "한미일",
+    "국방수권법",
+    "NATO",
+    "나토",
+    "호르무즈",
+    "이란 공습",
+    "군사 협력",
+    "안보 협력",
+    "K방산",
+    "방산 수출",
+    "핵심광물 공급망",
+)
+
 
 def build_google_news_url(terms: tuple[str, ...]) -> str:
     cleaned = tuple(term.strip() for term in terms if term.strip())
@@ -54,4 +85,16 @@ def build_google_news_sources(config: BriefConfig) -> tuple[Source, ...]:
 
 
 def configured_sources(config: BriefConfig) -> tuple[Source, ...]:
-    return PUBLIC_RSS_SOURCES + build_google_news_sources(config)
+    diplomacy_sources = (
+        Source(
+            name="Google 뉴스: 북한",
+            url=build_google_news_url(NORTH_KOREA_SEARCH_TERMS),
+            priority=50,
+        ),
+        Source(
+            name="Google 뉴스: 외교·안보",
+            url=build_google_news_url(DIPLOMACY_SECURITY_SEARCH_TERMS),
+            priority=50,
+        ),
+    )
+    return PUBLIC_RSS_SOURCES + build_google_news_sources(config) + diplomacy_sources

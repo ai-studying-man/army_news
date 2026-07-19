@@ -19,6 +19,8 @@ from army_morning_brief.collector import (
 from army_morning_brief.config import BriefConfig, CollectionWindow, DivisionRule
 from army_morning_brief.models import Source
 from army_morning_brief.sources import (
+    DIPLOMACY_SECURITY_SEARCH_TERMS,
+    NORTH_KOREA_SEARCH_TERMS,
     PUBLIC_RSS_SOURCES,
     build_google_news_sources,
     build_google_news_url,
@@ -63,6 +65,9 @@ def test_public_and_configured_sources_are_https_and_google_queries_are_encoded(
     assert "%EC%98%A4%EB%9A%9C%EA%B8%B0%20%EB%B6%80%EB%8C%80" in url
     assert len(PUBLIC_RSS_SOURCES) >= 2
     assert len(google_sources) == 2
+    assert len(all_sources) == len(PUBLIC_RSS_SOURCES) + 4
+    assert all_sources[-2].url == build_google_news_url(NORTH_KOREA_SEARCH_TERMS)
+    assert all_sources[-1].url == build_google_news_url(DIPLOMACY_SECURITY_SEARCH_TERMS)
     assert all(source.url.startswith("https://") for source in all_sources)
     assert all_sources[: len(PUBLIC_RSS_SOURCES)] == PUBLIC_RSS_SOURCES
 

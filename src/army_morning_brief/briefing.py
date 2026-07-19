@@ -27,7 +27,11 @@ def render_briefing_html(
     if run_at.tzinfo is None or run_at.utcoffset() is None:
         raise ValueError("run_at must be timezone-aware")
     blocks: list[str] = []
-    for group in (OutputGroup.DIVISION, OutputGroup.REGION):
+    for group in (
+        OutputGroup.DIVISION,
+        OutputGroup.REGION,
+        OutputGroup.DIPLOMACY_NORTH_KOREA,
+    ):
         items = groups.get(group, ())
         if not items:
             blocks.append(f"■ [{escape(group.value)}] 관련 기사 없음")
@@ -43,7 +47,7 @@ def render_briefing_html(
                 "\n".join(
                     (
                         f"■ [{escape(group.value)}] {title} ({source})",
-                        f'<a href="{escaped_url}">{escaped_url}</a>',
+                        f'<a href="{escaped_url}">기사 링크 바로가기</a>',
                         f"- {summary}",
                     )
                 )

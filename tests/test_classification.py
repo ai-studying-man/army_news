@@ -218,6 +218,37 @@ def test_natural_region_form_does_not_admit_ordinary_education_news() -> None:
 @pytest.mark.parametrize(
     "title",
     [
+        "北, DMZ 인근에 방사포 시설 건설한 정황",
+        "평양서 왕후닝 만난 김정은, 북중 관계 발전 강조",
+        "北과 군사 밀착하는 러시아, 한국·나토 협력 비판",
+        "한미일 협력에 북중러로 맞서나",
+        "韓 기업 차별 보고, 美 국방수권법서 제동",
+        "美, 상선 공격 중단 요구 무시한 이란에 또 공습…호르무즈 긴장",
+        "K방산 최대시장 수출 날개…핵심광물 공급망 확대",
+    ],
+)
+def test_diplomacy_and_north_korea_articles_are_classified(title: str) -> None:
+    result = classify_article(article(title), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.DIPLOMACY_NORTH_KOREA
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "북한산 등산로 정비 완료",
+        "평양냉면 여름 신메뉴 출시",
+        "미국 기업 일반 소비재 수출 증가",
+    ],
+)
+def test_diplomacy_group_rejects_homonyms_and_unrelated_trade(title: str) -> None:
+    assert classify_article(article(title), BriefConfig.default()) is None
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
         "양주시 교통사고로 도로 정체",
         "의정부 시민 안전교육 행사",
     ],

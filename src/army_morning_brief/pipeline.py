@@ -236,8 +236,13 @@ def _published_timestamp(value: datetime) -> float:
 
 def _ranking_key(selected: SelectedArticle) -> tuple[object, ...]:
     article = selected.article
+    group_rank = {
+        OutputGroup.DIVISION: 0,
+        OutputGroup.REGION: 1,
+        OutputGroup.DIPLOMACY_NORTH_KOREA: 2,
+    }
     return (
-        0 if selected.classification.group is OutputGroup.DIVISION else 1,
+        group_rank[selected.classification.group],
         -article.source.priority,
         -(article.view_count if article.view_count is not None else -1),
         article.feed_rank,
