@@ -27,6 +27,34 @@ def test_direct_division_alias_is_classified_with_highest_rank() -> None:
     assert result.matched_term == "오뚜기부대"
 
 
+def test_feed_label_division_alias_does_not_override_region_flood_content() -> None:
+    result = classify_article(
+        article(
+            "의정부 집중호우 피해",
+            "도로 침수와 주민 대피",
+            "Google 뉴스: 제8기동사단 지역",
+        ),
+        BriefConfig.default(),
+    )
+
+    assert result is not None
+    assert result.group is OutputGroup.REGION
+    assert result.matched_term == "의정부"
+
+
+def test_feed_label_division_alias_does_not_include_unrelated_region_education() -> None:
+    result = classify_article(
+        article(
+            "의정부도시교육재단 평생학습 프로그램",
+            "시민 교육 수강생 모집",
+            "Google 뉴스: 제8기동사단 지역",
+        ),
+        BriefConfig.default(),
+    )
+
+    assert result is None
+
+
 @pytest.mark.parametrize(
     ("title", "description", "source_name"),
     [
@@ -44,12 +72,10 @@ def test_region_needs_configured_place_and_allowed_context(
     assert result.group is OutputGroup.REGION
 
 
-def test_context_is_evaluated_across_title_description_and_source() -> None:
+def test_context_is_evaluated_across_title_and_description() -> None:
     config = BriefConfig(divisions=(DivisionRule("별빛사단", ("별빛부대",), ("춘천",)),))
 
-    result = classify_article(
-        article("춘천시 협력 행사", "지역 현안을 논의했다", "육군 공식 보도자료"), config
-    )
+    result = classify_article(article("춘천시 협력 행사", "육군과 지역 현안을 논의했다"), config)
 
     assert result is not None
     assert result.group is OutputGroup.REGION

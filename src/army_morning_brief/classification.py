@@ -70,7 +70,7 @@ class ClassificationResult:
 
 
 def classify_article(article: Article, config: BriefConfig) -> ClassificationResult | None:
-    context = " ".join((article.title, article.description, article.source.name)).casefold()
+    context = " ".join((article.title, article.description)).casefold()
     if any(term.casefold() in context for term in _FALSE_POSITIVE_TERMS):
         return None
     if any(term.casefold() in context for term in _SENSITIVE_TERMS):
