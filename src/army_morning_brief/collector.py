@@ -1,12 +1,15 @@
 """Bounded, failure-isolated collection of public RSS documents."""
 
-from collections.abc import Sequence
+import math
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 import httpx
 
@@ -16,6 +19,11 @@ from army_morning_brief.models import Article, Source
 MAX_FEED_BYTES = 5 * 1024 * 1024
 REQUEST_TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=5.0)
 USER_AGENT = "army-morning-brief/0.1 (+public-rss-collector)"
+MAX_RETRIES = 2
+MAX_SOURCE_SECONDS = 60.0
+_RETRY_DELAYS = (0.5, 1.0)
+_MAX_RETRY_DELAY_SECONDS = 5.0
+_TRANSIENT_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
 class FeedParseError(ValueError):
@@ -24,6 +32,14 @@ class FeedParseError(ValueError):
 
 class FeedTooLargeError(FeedParseError):
     """Raised when an RSS document exceeds the byte cap."""
+
+
+class _UnsafeXmlDeclaration(Exception):
+    """Raised by the Expat preflight parser for DTD/entity declarations."""
+
+
+class _SourceTimeLimitExceeded(Exception):
+    """Raised when a source exceeds its bounded collection time budget."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,12 +146,30 @@ def _normalize_title(title: str, item_source: Source | None) -> str:
     return normalized or title
 
 
+def _reject_unsafe_xml_declaration(*_args: object) -> None:
+    raise _UnsafeXmlDeclaration
+
+
+def _preflight_xml(xml: bytes) -> None:
+    """Validate XML syntax and reject declarations before ElementTree sees bytes."""
+    parser = expat.ParserCreate()
+    parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    parser.StartDoctypeDeclHandler = _reject_unsafe_xml_declaration
+    parser.EntityDeclHandler = _reject_unsafe_xml_declaration
+    # Keep entity references as parser input; never ask Expat to expand them.
+    parser.DefaultHandler = lambda _data: None
+    try:
+        parser.Parse(xml, True)
+    except _UnsafeXmlDeclaration:
+        raise FeedParseError("invalid RSS XML") from None
+    except expat.ExpatError as error:
+        raise FeedParseError("invalid RSS XML") from error
+
+
 def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Article, ...]:
     if len(xml) > MAX_FEED_BYTES:
         raise FeedTooLargeError("RSS document exceeds size limit")
-    lowered = xml.lower()
-    if b"<!doctype" in lowered or b"<!entity" in lowered:
-        raise FeedParseError("invalid RSS XML")
+    _preflight_xml(xml)
     try:
         root = ElementTree.fromstring(xml)
     except ElementTree.ParseError as error:
@@ -174,7 +208,7 @@ def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Art
     return tuple(articles)
 
 
-def _read_response(response: httpx.Response) -> bytes:
+def _read_response(response: httpx.Response, *, deadline: float | None = None) -> bytes:
     content_length = response.headers.get("content-length")
     if content_length is not None:
         try:
@@ -183,20 +217,61 @@ def _read_response(response: httpx.Response) -> bytes:
         except ValueError:
             pass
 
+    if deadline is not None and time.monotonic() >= deadline:
+        raise _SourceTimeLimitExceeded
     received = bytearray()
     for chunk in response.iter_bytes():
+        if deadline is not None and time.monotonic() >= deadline:
+            raise _SourceTimeLimitExceeded
         if len(received) + len(chunk) > MAX_FEED_BYTES:
             raise FeedTooLargeError("RSS document exceeds size limit")
         received.extend(chunk)
+    if deadline is not None and time.monotonic() >= deadline:
+        raise _SourceTimeLimitExceeded
     return bytes(received)
 
 
-def _collect_with_client(
-    sources: Sequence[Source], window: CollectionWindow, client: httpx.Client
-) -> CollectionResult:
-    articles: list[Article] = []
-    diagnostics: list[CollectionDiagnostic] = []
-    for source in sources:
+def _timeout_for_remaining(remaining: float) -> httpx.Timeout:
+    def cap(value: float | None) -> float:
+        return remaining if value is None else min(value, remaining)
+
+    return httpx.Timeout(
+        connect=cap(REQUEST_TIMEOUT.connect),
+        read=cap(REQUEST_TIMEOUT.read),
+        write=cap(REQUEST_TIMEOUT.write),
+        pool=cap(REQUEST_TIMEOUT.pool),
+    )
+
+
+def _retry_delay(attempt: int, response: httpx.Response | None = None) -> float:
+    if response is not None:
+        retry_after = response.headers.get("retry-after")
+        if retry_after is not None:
+            try:
+                parsed = float(retry_after)
+            except ValueError:
+                parsed = math.nan
+            if math.isfinite(parsed) and parsed >= 0:
+                return min(parsed, _MAX_RETRY_DELAY_SECONDS)
+    return _RETRY_DELAYS[min(attempt, len(_RETRY_DELAYS) - 1)]
+
+
+def _fetch_source_document(
+    source: Source,
+    client: httpx.Client,
+    *,
+    sleep: Callable[[float], None],
+    max_retries: int,
+) -> tuple[bytes | None, str | None]:
+    """Fetch one source with bounded retries and a source-wide time budget."""
+    deadline = time.monotonic() + MAX_SOURCE_SECONDS
+    for attempt in range(max_retries + 1):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None, "request_failed"
+        retry_delay: float | None = None
+        failure_code = "request_failed"
+        document: bytes | None = None
         try:
             with client.stream(
                 "GET",
@@ -205,23 +280,64 @@ def _collect_with_client(
                     "User-Agent": USER_AGENT,
                     "Accept": "application/rss+xml, application/xml",
                 },
-                timeout=REQUEST_TIMEOUT,
+                timeout=_timeout_for_remaining(remaining),
                 follow_redirects=True,
             ) as response:
                 if response.url.scheme.lower() != "https":
-                    diagnostics.append(CollectionDiagnostic(source.name, "non_https_redirect"))
-                    continue
-                if not response.is_success:
-                    diagnostics.append(CollectionDiagnostic(source.name, "http_status"))
-                    continue
-                document = _read_response(response)
+                    return None, "non_https_redirect"
+                if response.is_success:
+                    document = _read_response(response, deadline=deadline)
+                elif response.status_code in _TRANSIENT_STATUS_CODES:
+                    failure_code = "http_status"
+                    if attempt < max_retries:
+                        retry_delay = _retry_delay(attempt, response)
+                else:
+                    return None, "http_status"
+        except FeedTooLargeError:
+            return None, "feed_too_large"
+        except (httpx.HTTPError, _SourceTimeLimitExceeded):
+            if attempt < max_retries:
+                retry_delay = _retry_delay(attempt)
+
+        if document is not None:
+            return document, None
+        if retry_delay is None:
+            return None, failure_code
+        if time.monotonic() + retry_delay >= deadline:
+            return None, failure_code
+        sleep(retry_delay)
+    return None, "request_failed"
+
+
+def _collect_with_client(
+    sources: Sequence[Source],
+    window: CollectionWindow,
+    client: httpx.Client,
+    *,
+    sleep: Callable[[float], None],
+    max_retries: int,
+) -> CollectionResult:
+    articles: list[Article] = []
+    diagnostics: list[CollectionDiagnostic] = []
+    for source in sources:
+        document, diagnostic = _fetch_source_document(
+            source,
+            client,
+            sleep=sleep,
+            max_retries=max_retries,
+        )
+        if diagnostic is not None:
+            diagnostics.append(CollectionDiagnostic(source.name, diagnostic))
+            continue
+        if document is None:
+            diagnostics.append(CollectionDiagnostic(source.name, "request_failed"))
+            continue
+        try:
             articles.extend(parse_rss(document, source, window))
         except FeedTooLargeError:
             diagnostics.append(CollectionDiagnostic(source.name, "feed_too_large"))
         except FeedParseError:
             diagnostics.append(CollectionDiagnostic(source.name, "invalid_feed"))
-        except httpx.HTTPError:
-            diagnostics.append(CollectionDiagnostic(source.name, "request_failed"))
     return CollectionResult(tuple(articles), tuple(diagnostics))
 
 
@@ -230,8 +346,25 @@ def collect_articles(
     window: CollectionWindow,
     *,
     client: httpx.Client | None = None,
+    sleep: Callable[[float], None] | None = None,
+    max_retries: int = MAX_RETRIES,
 ) -> CollectionResult:
+    if max_retries < 0:
+        raise ValueError("max_retries cannot be negative")
+    sleeper = time.sleep if sleep is None else sleep
     if client is not None:
-        return _collect_with_client(sources, window, client)
+        return _collect_with_client(
+            sources,
+            window,
+            client,
+            sleep=sleeper,
+            max_retries=max_retries,
+        )
     with httpx.Client() as owned_client:
-        return _collect_with_client(sources, window, owned_client)
+        return _collect_with_client(
+            sources,
+            window,
+            owned_client,
+            sleep=sleeper,
+            max_retries=max_retries,
+        )

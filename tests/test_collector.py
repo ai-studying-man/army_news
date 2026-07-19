@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 import pytest
 
+from army_morning_brief import collector as collector_module
 from army_morning_brief.collector import (
     MAX_FEED_BYTES,
     FeedParseError,
@@ -194,6 +195,61 @@ def test_oversize_and_bad_xml_are_rejected() -> None:
         parse_rss(b"<rss><channel><item></rss>", SOURCE, WINDOW)
 
 
+def test_ascii_dtd_and_entity_declarations_are_rejected_before_elementtree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = b"""<!DOCTYPE rss [<!ENTITY expanded "unsafe">]>
+<rss><channel><item>
+  <title>&expanded;</title>
+  <link>https://news.example.test/entity</link>
+  <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+</item></channel></rss>
+"""
+
+    def unexpected_elementtree_parse(_xml: bytes) -> object:
+        raise AssertionError("unsafe XML reached ElementTree")
+
+    monkeypatch.setattr(collector_module.ElementTree, "fromstring", unexpected_elementtree_parse)
+
+    with pytest.raises(FeedParseError, match="invalid RSS XML"):
+        parse_rss(document, SOURCE, WINDOW)
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-16-le", "utf-16-be"])
+def test_dtd_and_entity_declarations_are_rejected_for_utf16_before_expansion(
+    encoding: str,
+) -> None:
+    document = (
+        """<?xml version="1.0" encoding="UTF-16"?>
+<!DOCTYPE rss [<!ENTITY expanded "8사단 장병 안전교육 실시">]>
+<rss><channel><item>
+  <title>&expanded;</title>
+  <link>https://news.example.test/utf16-entity</link>
+  <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+</item></channel></rss>
+"""
+    ).encode(encoding)
+
+    with pytest.raises(FeedParseError, match="invalid RSS XML"):
+        parse_rss(document, SOURCE, WINDOW)
+
+
+def test_utf16_without_declarations_remains_supported() -> None:
+    document = (
+        """<?xml version="1.0" encoding="UTF-16"?>
+<rss><channel><item>
+  <title>UTF-16 정상 기사</title>
+  <link>https://news.example.test/utf16-valid</link>
+  <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+</item></channel></rss>
+"""
+    ).encode("utf-16")
+
+    articles = parse_rss(document, SOURCE, WINDOW)
+
+    assert [article.title for article in articles] == ["UTF-16 정상 기사"]
+
+
 def test_out_of_window_items_are_excluded_but_both_edges_are_inclusive() -> None:
     articles = parse_rss(_fixture("daily_feed.xml"), SOURCE, WINDOW)
 
@@ -217,7 +273,12 @@ def test_partial_source_failure_continues_with_safe_diagnostics_and_request_poli
         return httpx.Response(503, content=b"PRIVATE RESPONSE BODY")
 
     with _client(handler) as client:
-        result = collect_articles((failed, good, broken), WINDOW, client=client)
+        result = collect_articles(
+            (failed, good, broken),
+            WINDOW,
+            client=client,
+            sleep=lambda _delay: None,
+        )
 
     assert len(result.articles) == 2
     assert [(item.source_name, item.code) for item in result.diagnostics] == [
@@ -227,7 +288,7 @@ def test_partial_source_failure_continues_with_safe_diagnostics_and_request_poli
     rendered = repr(result.diagnostics)
     assert "private-token-value" not in rendered
     assert "PRIVATE RESPONSE BODY" not in rendered
-    assert len(requests) == 3
+    assert len(requests) == 5
     assert all(
         request.headers["user-agent"].startswith("army-morning-brief/") for request in requests
     )
@@ -235,6 +296,90 @@ def test_partial_source_failure_continues_with_safe_diagnostics_and_request_poli
         request.extensions["timeout"] == {"connect": 5.0, "read": 15.0, "write": 15.0, "pool": 5.0}
         for request in requests
     )
+
+
+def test_transient_statuses_retry_with_bounded_backoff_and_recover() -> None:
+    attempts = 0
+    delays: list[float] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(503)
+        if attempts == 2:
+            return httpx.Response(429)
+        return httpx.Response(200, content=_fixture("daily_feed.xml"))
+
+    with _client(handler) as client:
+        result = collect_articles((SOURCE,), WINDOW, client=client, sleep=delays.append)
+
+    assert attempts == 3
+    assert delays == [0.5, 1.0]
+    assert len(result.articles) == 2
+    assert result.diagnostics == ()
+
+
+def test_retry_after_delay_is_capped() -> None:
+    attempts = 0
+    delays: list[float] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(429, headers={"retry-after": "9999"})
+        return httpx.Response(200, content=_fixture("daily_feed.xml"))
+
+    with _client(handler) as client:
+        result = collect_articles((SOURCE,), WINDOW, client=client, sleep=delays.append)
+
+    assert attempts == 2
+    assert delays == [5.0]
+    assert len(result.articles) == 2
+    assert result.diagnostics == ()
+
+
+def test_transport_failures_retry_without_leaking_error_details() -> None:
+    attempts = 0
+    delays: list[float] = []
+    leaked_url = "https://feeds.example.test/private-token-value.xml"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise httpx.ReadTimeout(f"timeout at {leaked_url}", request=request)
+        return httpx.Response(200, content=_fixture("daily_feed.xml"))
+
+    with _client(handler) as client:
+        result = collect_articles((SOURCE,), WINDOW, client=client, sleep=delays.append)
+
+    assert attempts == 3
+    assert delays == [0.5, 1.0]
+    assert len(result.articles) == 2
+    assert result.diagnostics == ()
+    assert leaked_url not in repr(result.diagnostics)
+
+
+def test_permanent_client_error_is_not_retried() -> None:
+    attempts = 0
+    delays: list[float] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(404, content=b"PRIVATE RESPONSE BODY")
+
+    with _client(handler) as client:
+        result = collect_articles((SOURCE,), WINDOW, client=client, sleep=delays.append)
+
+    assert attempts == 1
+    assert delays == []
+    assert [(item.source_name, item.code) for item in result.diagnostics] == [
+        (SOURCE.name, "http_status")
+    ]
+    assert "PRIVATE RESPONSE BODY" not in repr(result.diagnostics)
 
 
 def test_network_oversize_is_isolated_per_source() -> None:
