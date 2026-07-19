@@ -8,9 +8,10 @@ scheduled workflows after 60 days without repository activity in a public reposi
 workflow must still honor the fixed 05:00 KST collection cutoff.
 
 The Army News scope uses these aliases: `육군`, `8사단`, `8기동사단`, `3070부대`, and `오뚜기부대`.
-Regional monitoring covers `양주`, `동두천`, `포천`, `연천`, and `의정부`, including alcohol
-incidents, natural disasters, and military-related municipal work or events when Army context is
-confirmed.
+Regional monitoring covers `양주`, `동두천`, `포천`, `연천`, and `의정부`. Alcohol incidents
+and natural disasters qualify when the configured region and allowed subject are present; they do
+not require Army context. Military-related municipal work or events require the relevant military
+or Army context to be confirmed.
 
 ## Local dry-run
 
