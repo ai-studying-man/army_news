@@ -38,17 +38,23 @@ def test_c001_daily_fixture_dry_run_renders_expected_briefing(
     captured = capsys.readouterr()
     assert result == 0
     assert captured.err == ""
-    assert "■ [사단] 8사단 장병 안전교육 실시 (공개 언론사)" in captured.out
+    assert "🪖 <b>8사단 주요 뉴스</b>\n1. 8사단 장병 안전교육 실시 (공개 언론사)" in captured.out
     assert "https://news.example.test/division-safety" in captured.out
     assert "- 장병 대상 안전 교육 &amp; 점검" in captured.out
-    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)" in captured.out
+    assert "📍 <b>지역 뉴스</b>\n1. 양주시 군·관 재난대응 협력 (fixture)" in captured.out
     assert "https://news.example.test/region-cooperation" in captured.out
     assert "- 양주시와 군 관계자가 공개 훈련을 점검했다." in captured.out
-    assert "<b>" not in captured.out
+    assert "🌐 <b>외교·북한 관련</b>\n관련 기사 없음" in captured.out
+    assert captured.out.index("🪖 <b>8사단 주요 뉴스</b>") < captured.out.index(
+        "📍 <b>지역 뉴스</b>"
+    )
+    assert captured.out.index("📍 <b>지역 뉴스</b>") < captured.out.index(
+        "🌐 <b>외교·북한 관련</b>"
+    )
+    assert "■ [" not in captured.out
     assert "출처:" not in captured.out
     assert "발행:" not in captured.out
     assert "원문 기사" not in captured.out
-    assert "1." not in captured.out
     assert "too-early" not in captured.out
     assert "too-late" not in captured.out
 
@@ -70,7 +76,7 @@ def test_delayed_run_keeps_fixed_0500_cutoff_and_boundary_region_article(
 
     captured = capsys.readouterr()
     assert result == 0
-    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)" in captured.out
+    assert "📍 <b>지역 뉴스</b>\n1. 양주시 군·관 재난대응 협력 (fixture)" in captured.out
     assert "too-late" not in captured.out
 
 

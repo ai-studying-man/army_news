@@ -79,16 +79,26 @@ step and are never command-line arguments.
 ## Message format and duplicate handling
 
 Keep only the representative original article for each incident; do not send syndicated duplicates.
+Telegram HTML renders exactly these sections, in this order: `🪖 <b>8사단 주요 뉴스</b>`,
+`📍 <b>지역 뉴스</b>`, and `🌐 <b>외교·북한 관련</b>`. Article numbering starts at `1.` in each
+section and resets for the next section. An empty section keeps its heading and shows `관련 기사 없음`.
 Each item is exactly three logical lines, with a blank line between items. Telegram HTML renders the
 HTTPS URL line as a short clickable `기사 링크 바로가기` link:
 
 ```text
-■ [사단] 기사 제목 (신문명)
+🪖 <b>8사단 주요 뉴스</b>
+1. 기사 제목 (신문명)
+기사 링크 바로가기
+- 한두문장으로 기사 요약
+
+📍 <b>지역 뉴스</b>
+관련 기사 없음
+
+🌐 <b>외교·북한 관련</b>
+1. 기사 제목 (신문명)
 기사 링크 바로가기
 - 한두문장으로 기사 요약
 ```
-
-Use `[지역]` for a regional item and `[외교·북한]` for diplomacy or North Korea coverage.
 
 ## Duplicate guard and delivery limits
 

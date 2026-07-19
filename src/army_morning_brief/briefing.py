@@ -9,6 +9,11 @@ from army_morning_brief.classification import OutputGroup
 from army_morning_brief.pipeline import SelectedArticle
 
 _SENTENCE_PATTERN = re.compile(r".*?[.!?。！？](?=\s|$)|.+$", re.DOTALL)
+_SECTION_HEADINGS = (
+    (OutputGroup.DIVISION, "🪖 <b>8사단 주요 뉴스</b>"),
+    (OutputGroup.REGION, "📍 <b>지역 뉴스</b>"),
+    (OutputGroup.DIPLOMACY_NORTH_KOREA, "🌐 <b>외교·북한 관련</b>"),
+)
 
 
 def extractive_summary(selected: SelectedArticle) -> str:
@@ -27,29 +32,27 @@ def render_briefing_html(
     if run_at.tzinfo is None or run_at.utcoffset() is None:
         raise ValueError("run_at must be timezone-aware")
     blocks: list[str] = []
-    for group in (
-        OutputGroup.DIVISION,
-        OutputGroup.REGION,
-        OutputGroup.DIPLOMACY_NORTH_KOREA,
-    ):
+    for group, heading in _SECTION_HEADINGS:
         items = groups.get(group, ())
         if not items:
-            blocks.append(f"■ [{escape(group.value)}] 관련 기사 없음")
+            blocks.append(f"{heading}\n관련 기사 없음")
             continue
-        for selected in items:
+        items_blocks: list[str] = []
+        for number, selected in enumerate(items, start=1):
             article = selected.article
             title = escape(" ".join(article.title.split()))
             source = escape(" ".join(article.source.name.split()))
             url = " ".join(article.url.split())
             escaped_url = escape(url, quote=True)
             summary = escape(" ".join(extractive_summary(selected).split()))
-            blocks.append(
+            items_blocks.append(
                 "\n".join(
                     (
-                        f"■ [{escape(group.value)}] {title} ({source})",
+                        f"{number}. {title} ({source})",
                         f'<a href="{escaped_url}">기사 링크 바로가기</a>',
                         f"- {summary}",
                     )
                 )
             )
+        blocks.append(f"{heading}\n{'\n\n'.join(items_blocks)}")
     return "\n\n".join(blocks)

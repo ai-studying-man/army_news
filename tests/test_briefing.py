@@ -48,8 +48,23 @@ def test_extractive_summary_falls_back_to_original_title() -> None:
 def test_renderer_uses_three_line_items_with_short_clickable_links() -> None:
     html = render_briefing_html(
         {
-            OutputGroup.DIVISION: (selected(),),
-            OutputGroup.REGION: (selected(title="양주 산불 대응", group=OutputGroup.REGION),),
+            OutputGroup.DIVISION: (
+                selected(),
+                selected(
+                    title="8사단 추가 소식",
+                    description="추가 기사 첫 문장.",
+                    url="https://news.example/division-2",
+                ),
+            ),
+            OutputGroup.REGION: (
+                selected(title="양주 산불 대응", group=OutputGroup.REGION),
+                selected(
+                    title="동두천 협력 소식",
+                    description="지역 기사 첫 문장.",
+                    url="https://news.example/region-2",
+                    group=OutputGroup.REGION,
+                ),
+            ),
             OutputGroup.DIPLOMACY_NORTH_KOREA: (
                 selected(
                     title="북한 군사 동향",
@@ -60,24 +75,40 @@ def test_renderer_uses_three_line_items_with_short_clickable_links() -> None:
         datetime(2026, 7, 17, 21, 30, tzinfo=UTC),
     )
 
-    assert "■ [사단] 8사단 &lt;안전&gt; 점검 &amp; 교육 (공식 &amp; 뉴스)" in html
-    assert (
-        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>'
-    ) in html
-    assert "■ [지역] 양주 산불 대응 (공식 &amp; 뉴스)" in html
-    assert "■ [외교·북한] 북한 군사 동향 (공식 &amp; 뉴스)" in html
-    assert "첫 문장에 &lt;점검&gt; 사실이 있다." in html
+    assert html == (
+        "🪖 <b>8사단 주요 뉴스</b>\n"
+        "1. 8사단 &lt;안전&gt; 점검 &amp; 교육 (공식 &amp; 뉴스)\n"
+        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
+        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!\n\n"
+        "2. 8사단 추가 소식 (공식 &amp; 뉴스)\n"
+        '<a href="https://news.example/division-2">기사 링크 바로가기</a>\n'
+        "- 추가 기사 첫 문장.\n\n"
+        "📍 <b>지역 뉴스</b>\n"
+        "1. 양주 산불 대응 (공식 &amp; 뉴스)\n"
+        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
+        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!\n\n"
+        "2. 동두천 협력 소식 (공식 &amp; 뉴스)\n"
+        '<a href="https://news.example/region-2">기사 링크 바로가기</a>\n'
+        "- 지역 기사 첫 문장.\n\n"
+        "🌐 <b>외교·북한 관련</b>\n"
+        "1. 북한 군사 동향 (공식 &amp; 뉴스)\n"
+        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
+        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!"
+    )
+    assert "■ [" not in html
     assert "셋째 문장은 제외한다" not in html
-    assert "<b>" not in html
     assert "출처:" not in html and "발행:" not in html and "원문 기사" not in html
-    assert "1." not in html
-    assert html.count("\n") == 10
     assert split_html_message(html)
 
 
-def test_renderer_keeps_empty_groups_unambiguous_without_section_headings() -> None:
+def test_renderer_keeps_empty_groups_with_section_headings() -> None:
     html = render_briefing_html({}, datetime(2026, 7, 18, 6, tzinfo=KST))
 
     assert html == (
-        "■ [사단] 관련 기사 없음\n\n■ [지역] 관련 기사 없음\n\n■ [외교·북한] 관련 기사 없음"
+        "🪖 <b>8사단 주요 뉴스</b>\n"
+        "관련 기사 없음\n\n"
+        "📍 <b>지역 뉴스</b>\n"
+        "관련 기사 없음\n\n"
+        "🌐 <b>외교·북한 관련</b>\n"
+        "관련 기사 없음"
     )
