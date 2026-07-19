@@ -82,25 +82,37 @@ step and are never command-line arguments.
 ## Message format and duplicate handling
 
 Keep only the representative original article for each incident; do not send syndicated duplicates.
-Telegram HTML renders exactly these sections, in this order: `🪖 <b>8사단 주요 뉴스</b>`,
-`📍 <b>지역 뉴스</b>`, and `🌐 <b>외교·북한 관련</b>`. Article numbering starts at `1.` in each
+The message begins with the KST local date and a deterministic safe military/professional daily
+phrase. A 36-hyphen divider precedes each of the following sections, in this order: `🪖 육군&8사단
+주요 뉴스`, `📍 지역 뉴스`, and `🌐 외교/북한 관련`. Article numbering starts at `1.` in each
 section and resets for the next section. An empty section keeps its heading and shows `관련 기사 없음`.
-Each item is exactly three logical lines, with a blank line between items. Telegram HTML renders the
-HTTPS URL line as a short clickable `기사 링크 바로가기` link:
+Each item is exactly three logical lines, with a blank line between items. The practical note contains
+one source-derived sentence; if the RSS description only repeats the title and publisher, use
+`세부 내용은 원문 기사에서 확인하세요.`. Telegram HTML renders the escaped HTTPS URL as a short
+clickable `뉴스 기사 링크 바로가기` link:
 
 ```text
-🪖 <b>8사단 주요 뉴스</b>
-1. 기사 제목 (신문명)
-기사 링크 바로가기
-- 한두문장으로 기사 요약
+출근 길, 오늘의 뉴스는? 💡
+YYYY.MM.DD.(요일)
 
-📍 <b>지역 뉴스</b>
+💬오늘의 한마디
+"날짜별 군 관련 일일 문구"
+
+------------------------------------
+🪖 육군&8사단 주요 뉴스
+1. 기사 제목
+   ✅실무 참고 : 한 줄 요약
+   🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
+
+------------------------------------
+📍 지역 뉴스
 관련 기사 없음
 
-🌐 <b>외교·북한 관련</b>
-1. 기사 제목 (신문명)
-기사 링크 바로가기
-- 한두문장으로 기사 요약
+------------------------------------
+🌐 외교/북한 관련
+1. 기사 제목
+   ✅실무 참고 : 한 줄 요약
+   🔗<a href="https://example.com/article">뉴스 기사 링크 바로가기</a>
 ```
 
 ## Duplicate guard and delivery limits

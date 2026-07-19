@@ -7,14 +7,13 @@ from army_morning_brief.pipeline import SelectedArticle
 from army_morning_brief.telegram import split_html_message
 
 KST = timezone(timedelta(hours=9))
+DIVIDER = "-" * 36
 
 
 def selected(
     *,
     title: str = "8사단 <안전> 점검 & 교육",
-    description: str = (
-        "첫 문장에 <점검> 사실이 있다. 둘째 문장도 기사에 있다! 셋째 문장은 제외한다."
-    ),
+    description: str = "첫 문장에 <점검> 사실이 있다. 둘째 문장도 기사에 있다!",
     url: str = 'https://news.example/a?x=1&unsafe="yes"',
     source: str = "공식 & 뉴스",
     group: OutputGroup = OutputGroup.DIVISION,
@@ -29,14 +28,14 @@ def selected(
     return SelectedArticle(item, ClassificationResult(group, "8사단"))
 
 
-def test_extractive_summary_copies_only_first_two_description_sentences() -> None:
+def test_extractive_summary_uses_one_source_sentence() -> None:
     item = selected()
 
     summary = extractive_summary(item)
 
-    assert summary == "첫 문장에 <점검> 사실이 있다. 둘째 문장도 기사에 있다!"
+    assert summary == "첫 문장에 <점검> 사실이 있다."
     assert summary in item.article.description
-    assert "실무" not in summary
+    assert "둘째 문장" not in summary
 
 
 def test_extractive_summary_falls_back_to_original_title() -> None:
@@ -45,7 +44,23 @@ def test_extractive_summary_falls_back_to_original_title() -> None:
     assert extractive_summary(item) == "원문 제목 그대로"
 
 
-def test_renderer_uses_three_line_items_with_short_clickable_links() -> None:
+def test_extractive_summary_replaces_redundant_title_and_publisher() -> None:
+    item = selected(
+        title="8사단 훈련 소식",
+        description="8사단 훈련 소식 - 공식 & 뉴스",
+    )
+
+    assert extractive_summary(item) == "세부 내용은 원문 기사에서 확인하세요."
+
+    plain_space_item = selected(
+        title="8사단 훈련 소식",
+        description="8사단 훈련 소식 공식 & 뉴스",
+    )
+
+    assert extractive_summary(plain_space_item) == "세부 내용은 원문 기사에서 확인하세요."
+
+
+def test_renderer_uses_final_digest_template_and_escapes_dynamic_html() -> None:
     html = render_briefing_html(
         {
             OutputGroup.DIVISION: (
@@ -72,43 +87,66 @@ def test_renderer_uses_three_line_items_with_short_clickable_links() -> None:
                 ),
             ),
         },
-        datetime(2026, 7, 17, 21, 30, tzinfo=UTC),
+        datetime(2026, 7, 18, 21, 30, tzinfo=UTC),
     )
 
-    assert html == (
-        "🪖 <b>8사단 주요 뉴스</b>\n"
-        "1. 8사단 &lt;안전&gt; 점검 &amp; 교육 (공식 &amp; 뉴스)\n"
-        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
-        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!\n\n"
-        "2. 8사단 추가 소식 (공식 &amp; 뉴스)\n"
-        '<a href="https://news.example/division-2">기사 링크 바로가기</a>\n'
-        "- 추가 기사 첫 문장.\n\n"
-        "📍 <b>지역 뉴스</b>\n"
-        "1. 양주 산불 대응 (공식 &amp; 뉴스)\n"
-        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
-        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!\n\n"
-        "2. 동두천 협력 소식 (공식 &amp; 뉴스)\n"
-        '<a href="https://news.example/region-2">기사 링크 바로가기</a>\n'
-        "- 지역 기사 첫 문장.\n\n"
-        "🌐 <b>외교·북한 관련</b>\n"
-        "1. 북한 군사 동향 (공식 &amp; 뉴스)\n"
-        '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">기사 링크 바로가기</a>\n'
-        "- 첫 문장에 &lt;점검&gt; 사실이 있다. 둘째 문장도 기사에 있다!"
-    )
-    assert "■ [" not in html
-    assert "셋째 문장은 제외한다" not in html
-    assert "출처:" not in html and "발행:" not in html and "원문 기사" not in html
+    assert html.startswith('출근 길, 오늘의 뉴스는? 💡\n2026.07.19.(일)\n\n💬오늘의 한마디\n"')
+    assert html.splitlines()[4].endswith('"')
+    assert html.count(DIVIDER) == 3
+    assert html.index("🪖 육군&8사단 주요 뉴스") < html.index("📍 지역 뉴스")
+    assert html.index("📍 지역 뉴스") < html.index("🌐 외교/북한 관련")
+    assert (
+        "1. 8사단 &lt;안전&gt; 점검 &amp; 교육\n"
+        "   ✅실무 참고 : 첫 문장에 &lt;점검&gt; 사실이 있다.\n"
+        '   🔗<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">'
+        "뉴스 기사 링크 바로가기</a>"
+    ) in html
+    assert "2. 8사단 추가 소식\n" in html
+    assert "1. 양주 산불 대응\n" in html
+    assert "2. 동두천 협력 소식\n" in html
+    assert "1. 북한 군사 동향\n" in html
+    assert " (공식 &amp; 뉴스)" not in html
+    assert "[사단]" not in html and "[지역]" not in html and "[외교/북한]" not in html
+    assert ">기사 링크 바로가기</a>" not in html
+    assert "- 첫 문장" not in html
     assert split_html_message(html)
 
 
-def test_renderer_keeps_empty_groups_with_section_headings() -> None:
-    html = render_briefing_html({}, datetime(2026, 7, 18, 6, tzinfo=KST))
+def test_renderer_quote_is_deterministic_and_changes_by_kst_date() -> None:
+    sunday = render_briefing_html({}, datetime(2026, 7, 18, 21, 30, tzinfo=UTC))
+    sunday_rerun = render_briefing_html({}, datetime(2026, 7, 18, 21, 30, tzinfo=UTC))
+    monday = render_briefing_html({}, datetime(2026, 7, 19, 21, 30, tzinfo=UTC))
 
-    assert html == (
-        "🪖 <b>8사단 주요 뉴스</b>\n"
-        "관련 기사 없음\n\n"
-        "📍 <b>지역 뉴스</b>\n"
-        "관련 기사 없음\n\n"
-        "🌐 <b>외교·북한 관련</b>\n"
-        "관련 기사 없음"
+    assert sunday == sunday_rerun
+    assert sunday.splitlines()[4] != monday.splitlines()[4]
+    assert monday.startswith("출근 길, 오늘의 뉴스는? 💡\n2026.07.20.(월)\n")
+
+
+def test_renderer_replaces_redundant_description_in_item_note() -> None:
+    html = render_briefing_html(
+        {
+            OutputGroup.DIVISION: (
+                selected(
+                    title="8사단 훈련 소식",
+                    description="8사단 훈련 소식 - 공식 & 뉴스",
+                ),
+            )
+        },
+        datetime(2026, 7, 19, 6, tzinfo=KST),
     )
+
+    assert "   ✅실무 참고 : 세부 내용은 원문 기사에서 확인하세요." in html
+    assert "   ✅실무 참고 : 8사단 훈련 소식" not in html
+
+
+def test_renderer_keeps_empty_groups_with_headings_and_dividers() -> None:
+    html = render_briefing_html({}, datetime(2026, 7, 19, 6, tzinfo=KST))
+
+    assert html.startswith("출근 길, 오늘의 뉴스는? 💡\n2026.07.19.(일)\n")
+    assert html.count("관련 기사 없음") == 3
+    assert html.count(DIVIDER) == 3
+    assert (
+        f"{DIVIDER}\n🪖 육군&8사단 주요 뉴스\n관련 기사 없음\n\n"
+        f"{DIVIDER}\n📍 지역 뉴스\n관련 기사 없음\n\n"
+        f"{DIVIDER}\n🌐 외교/북한 관련\n관련 기사 없음"
+    ) in html
