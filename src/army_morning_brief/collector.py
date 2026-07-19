@@ -103,21 +103,31 @@ def _is_https_url(value: str) -> bool:
     return parsed.scheme.lower() == "https" and bool(parsed.netloc)
 
 
-def _article_source(item: ElementTree.Element, feed_source: Source) -> Source:
+def _item_publisher_source(item: ElementTree.Element, feed_source: Source) -> Source | None:
     publisher = next(
         (child for child in item if _local_name(child.tag) == "source"),
         None,
     )
     if publisher is None:
-        return feed_source
+        return None
     name = _visible_text("".join(publisher.itertext()).strip())
     url = (publisher.get("url") or "").strip()
     if not name or not _is_https_url(url):
-        return feed_source
+        return None
     try:
         return Source(name=name, url=url, priority=feed_source.priority)
     except ValueError:
-        return feed_source
+        return None
+
+
+def _normalize_title(title: str, item_source: Source | None) -> str:
+    if item_source is None:
+        return title
+    suffix = f" - {item_source.name}"
+    if not title.endswith(suffix):
+        return title
+    normalized = title[: -len(suffix)].rstrip()
+    return normalized or title
 
 
 def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Article, ...]:
@@ -135,6 +145,9 @@ def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Art
     items = (element for element in root.iter() if _local_name(element.tag) == "item")
     for feed_rank, item in enumerate(items):
         title = _visible_text(_child_text(item, "title"))
+        item_source = _item_publisher_source(item, source)
+        article_source = item_source or source
+        title = _normalize_title(title, item_source)
         description = _visible_text(_child_text(item, "description", "summary"))
         url = _child_text(item, "link")
         published_at = _published_at(_child_text(item, "pubDate", "published", "updated"))
@@ -152,7 +165,7 @@ def parse_rss(xml: bytes, source: Source, window: CollectionWindow) -> tuple[Art
                     description=description,
                     url=url,
                     published_at=published_at,
-                    source=_article_source(item, source),
+                    source=article_source,
                     feed_rank=feed_rank,
                 )
             )

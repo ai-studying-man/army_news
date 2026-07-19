@@ -114,6 +114,65 @@ def test_invalid_or_incomplete_item_publisher_falls_back_to_feed_source(
     assert articles[0].url == "https://news.google.com/rss/articles/public-test-token"
 
 
+@pytest.mark.parametrize(
+    ("title", "publisher_markup", "expected_title", "expected_source"),
+    [
+        (
+            "Article - News",
+            '<source url="https://publisher.example.test/">News</source>',
+            "Article",
+            "News",
+        ),
+        (
+            "Article - Newswire",
+            '<source url="https://publisher.example.test/">News</source>',
+            "Article - Newswire",
+            "News",
+        ),
+        (
+            "Article — News",
+            '<source url="https://publisher.example.test/">News</source>',
+            "Article — News",
+            "News",
+        ),
+        (
+            "Article - News",
+            "",
+            "Article - News",
+            SOURCE.name,
+        ),
+        (
+            "Article - News",
+            '<source url="http://publisher.example.test/">News</source>',
+            "Article - News",
+            SOURCE.name,
+        ),
+    ],
+)
+def test_item_publisher_suffix_normalization_requires_exact_valid_source(
+    title: str,
+    publisher_markup: str,
+    expected_title: str,
+    expected_source: str,
+) -> None:
+    document = f"""\
+<rss version="2.0"><channel><item>
+  <title>{title}</title>
+  <link>https://news.google.com/rss/articles/title-source-test</link>
+  <pubDate>Fri, 17 Jul 2026 08:00:00 GMT</pubDate>
+  {publisher_markup}
+</item></channel></rss>
+""".encode()
+
+    articles = parse_rss(document, SOURCE, WINDOW)
+
+    assert len(articles) == 1
+    assert articles[0].title == expected_title
+    assert articles[0].source.name == expected_source
+    assert articles[0].source.priority == SOURCE.priority
+    assert articles[0].url == "https://news.google.com/rss/articles/title-source-test"
+
+
 def test_adversarial_items_are_isolated_without_filtering_valid_homonyms_or_duplicates() -> None:
     articles = parse_rss(_fixture("adversarial_feed.xml"), SOURCE, WINDOW)
 
