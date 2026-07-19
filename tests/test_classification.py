@@ -59,6 +59,17 @@ def test_general_army_alias_classifies_content_as_division() -> None:
     assert result.matched_term == "육군"
 
 
+def test_general_army_alias_matches_relevant_embedded_title_form() -> None:
+    result = classify_article(
+        article("춘천코리아오픈국제태권도대회 육군태권도시범단 격파 시범"),
+        BriefConfig.default(),
+    )
+
+    assert result is not None
+    assert result.group is OutputGroup.DIVISION
+    assert result.matched_term == "육군"
+
+
 @pytest.mark.parametrize(
     "title",
     [
@@ -178,6 +189,30 @@ def test_sensitive_location_movement_and_deployment_content_is_rejected(title: s
 
 def test_region_without_army_safety_disaster_or_civil_military_context_is_rejected() -> None:
     assert classify_article(article("포천시 여름 축제 개막"), BriefConfig.default()) is None
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "또 물바다 된 고양시 화전동…양주선 옹벽 무너져",
+        "의정부지역 18일 시간당 44.0mm 물폭탄 이어 산사태 주의보",
+    ],
+)
+def test_region_matches_natural_forms_with_live_disaster_cues(title: str) -> None:
+    result = classify_article(article(title), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.REGION
+
+
+def test_natural_region_form_does_not_admit_ordinary_education_news() -> None:
+    assert (
+        classify_article(
+            article("의정부지역 초등학생 교육 프로그램 참가자 모집"),
+            BriefConfig.default(),
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize(

@@ -72,6 +72,8 @@ _REGION_DISASTER_TERMS = (
     "산사태",
     "수해",
     "가뭄",
+    "물바다",
+    "고립",
 )
 
 _REGION_MUNICIPAL_TERMS = (
@@ -159,6 +161,7 @@ _ARMY_WORK_TERMS = (
     "사격",
     "기동",
     "경계",
+    "시범",
     "재난대응",
     "재난 대응",
     "재해대응",
@@ -209,12 +212,14 @@ _REGION_ADMIN_SUFFIXES = (
     "시청",
     "군청",
     "구청",
+    "지역",
     "시",
     "군",
     "구",
     "읍",
     "면",
     "동",
+    "선",
 )
 _REGION_ADMIN_SUFFIX_PATTERN = "(?:" + "|".join(_REGION_ADMIN_SUFFIXES) + ")?"
 
@@ -324,7 +329,7 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
 
     if (
         general_army_aliases
-        and _contains_any_token(context, tuple(general_army_aliases))
+        and _contains_any_stem(context, tuple(general_army_aliases))
         and _has_army_work_context(context)
     ):
         return ClassificationResult(
