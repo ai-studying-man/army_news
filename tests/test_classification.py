@@ -27,12 +27,61 @@ def test_direct_division_alias_is_classified_with_highest_rank() -> None:
     assert result.matched_term == "오뚜기부대"
 
 
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("18사단 장병 훈련", None),
+        ("오뚜기부대찌개 신메뉴 출시", None),
+        ("8사단 장병 훈련", OutputGroup.DIVISION),
+        ("제8기동사단 장병 훈련", OutputGroup.DIVISION),
+        ("오뚜기부대와 대민지원", OutputGroup.DIVISION),
+    ],
+)
+def test_division_alias_matching_is_token_safe(title: str, expected: OutputGroup | None) -> None:
+    result = classify_article(article(title), BriefConfig.default())
+
+    assert result is None if expected is None else result is not None and result.group is expected
+
+
+def test_direct_configured_unit_alias_is_strong_evidence() -> None:
+    result = classify_article(article("오뚜기부대 단순 소개"), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.DIVISION
+    assert result.matched_term == "오뚜기부대"
+
+
 def test_general_army_alias_classifies_content_as_division() -> None:
     result = classify_article(article("육군, AI 기반 드론 전력화 추진"), BriefConfig.default())
 
     assert result is not None
     assert result.group is OutputGroup.DIVISION
     assert result.matched_term == "육군"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "육군 전력화 추진",
+        "육군 합동훈련 실시",
+        "육군 작전 수행",
+        "육군 장병 복지",
+        "육군 부대 점검",
+        "육군 대민지원 실시",
+    ],
+)
+def test_general_army_alias_requires_army_work_context(title: str) -> None:
+    result = classify_article(article(title), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.DIVISION
+    assert result.matched_term == "육군"
+
+
+def test_personal_army_nostalgia_is_not_division_news() -> None:
+    assert (
+        classify_article(article("배우가 육군 복무 시절을 회상했다"), BriefConfig.default()) is None
+    )
 
 
 def test_general_army_alias_does_not_override_region_context() -> None:
@@ -129,6 +178,41 @@ def test_sensitive_location_movement_and_deployment_content_is_rejected(title: s
 
 def test_region_without_army_safety_disaster_or_civil_military_context_is_rejected() -> None:
     assert classify_article(article("포천시 여름 축제 개막"), BriefConfig.default()) is None
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "양주시 교통사고로 도로 정체",
+        "의정부 시민 안전교육 행사",
+    ],
+)
+def test_region_requires_allowed_subject_or_military_municipal_context(title: str) -> None:
+    assert classify_article(article(title), BriefConfig.default()) is None
+
+
+@pytest.mark.parametrize(
+    ("title", "description"),
+    [
+        ("양주시 군부대 협력 업무", "지자체와 부대가 공동 대응했다"),
+        ("동두천 국방 협약 행사", "장병과 시청 관계자가 참여했다"),
+        ("포천 부대 지원 사업", "군과 지자체가 현안을 논의했다"),
+        ("연천 장병 봉사 활동", "지역 주민과 군이 교류했다"),
+    ],
+)
+def test_region_keeps_military_municipal_work_and_events(title: str, description: str) -> None:
+    result = classify_article(article(title, description), BriefConfig.default())
+
+    assert result is not None
+    assert result.group is OutputGroup.REGION
+
+
+def test_source_labels_are_not_classification_evidence() -> None:
+    result = classify_article(
+        article("일반 시민 행사", source_name="육군 8사단 지역 뉴스"), BriefConfig.default()
+    )
+
+    assert result is None
 
 
 def test_custom_rules_keep_different_divisions_and_regions_representable() -> None:
