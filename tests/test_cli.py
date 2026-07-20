@@ -38,18 +38,15 @@ def test_c001_daily_fixture_dry_run_renders_expected_briefing(
     captured = capsys.readouterr()
     assert result == 0
     assert captured.err == ""
-    assert captured.out.startswith("출근 길, 오늘의 뉴스는? 💡\n2026.07.18.(토)\n")
-    assert captured.out.count("-" * 36) == 3
-    assert "🪖 육군&8사단 주요 뉴스\n8사단 장병 안전교육 실시\n" in captured.out
+    assert captured.out.startswith("['26.7.18.(토), 아침 언론 모니터 결과]\n")
+    assert "■ [사단] 8사단 장병 안전교육 실시 (공개 언론사)\n" in captured.out
     assert "https://news.example.test/division-safety" in captured.out
-    assert "✅실무 참고 : 장병 대상 안전 교육 &amp; 점검" in captured.out
-    assert "📍 지역 뉴스\n양주시 군·관 재난대응 협력\n" in captured.out
+    assert "- 장병 대상 안전 교육 &amp; 점검" in captured.out
+    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)\n" in captured.out
     assert "https://news.example.test/region-cooperation" in captured.out
-    assert "✅실무 참고 : 양주시와 군 관계자가 공개 훈련을 점검했다." in captured.out
-    assert "🌐 외교/북한 관련\n관련 기사 없음" in captured.out
-    assert captured.out.index("🪖 육군&8사단 주요 뉴스") < captured.out.index("📍 지역 뉴스")
-    assert captured.out.index("📍 지역 뉴스") < captured.out.index("🌐 외교/북한 관련")
-    assert "■ [" not in captured.out
+    assert "- 양주시와 군 관계자가 공개 훈련을 점검했다." in captured.out
+    assert "※ 외교/북한 관련 보도 없음" in captured.out
+    assert captured.out.index("■ [사단]") < captured.out.index("■ [지역]")
     assert "출처:" not in captured.out
     assert "발행:" not in captured.out
     assert "원문 기사" not in captured.out
@@ -74,7 +71,7 @@ def test_delayed_run_keeps_fixed_0500_cutoff_and_boundary_region_article(
 
     captured = capsys.readouterr()
     assert result == 0
-    assert "📍 지역 뉴스\n양주시 군·관 재난대응 협력\n" in captured.out
+    assert "■ [지역] 양주시 군·관 재난대응 협력" in captured.out
     assert "too-late" not in captured.out
 
 

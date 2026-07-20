@@ -1,5 +1,3 @@
-"""Telegram-ready briefing rendering."""
-
 import re
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
@@ -11,17 +9,12 @@ from army_morning_brief.pipeline import SelectedArticle
 
 _SENTENCE_PATTERN = re.compile(r".*?[.!?。！？](?=\s|$)|.+$", re.DOTALL)
 _WEEKDAYS = ("월", "화", "수", "목", "금", "토", "일")
-_DAILY_QUOTES = (
-    "기본과 원칙이 현장의 안전을 지킵니다.",
-    "정확한 확인이 안전한 임무를 만듭니다.",
-    "함께 준비하고 함께 책임지는 하루를 만듭니다.",
+_GROUP_LABELS = (
+    (OutputGroup.DIVISION, "사단"),
+    (OutputGroup.REGION, "지역"),
+    (OutputGroup.DIPLOMACY_NORTH_KOREA, "외교/북한"),
 )
-_DIVIDER = "-" * 36
-_SECTION_HEADINGS = (
-    (OutputGroup.DIVISION, "🪖 육군&8사단 주요 뉴스"),
-    (OutputGroup.REGION, "📍 지역 뉴스"),
-    (OutputGroup.DIPLOMACY_NORTH_KOREA, "🌐 외교/북한 관련"),
-)
+_SUMMARY_LIMIT = 50
 
 _REDUNDANT_DESCRIPTION_SEPARATORS = (" - ", " – ", " — ", " | ", " · ", ": ", " / ", " ")
 
@@ -53,10 +46,6 @@ def _kst_date(run_at: datetime) -> date:
     return run_at.astimezone(KST).date()
 
 
-def _daily_quote(run_date: date) -> str:
-    return _DAILY_QUOTES[run_date.toordinal() % len(_DAILY_QUOTES)]
-
-
 def extractive_summary(selected: SelectedArticle) -> str | None:
     description = _normalized_text(selected.article.description)
     if not description:
@@ -67,38 +56,55 @@ def extractive_summary(selected: SelectedArticle) -> str | None:
     return sentences[0] if sentences else description
 
 
+def _truncate_naturally(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    shortened = value[: limit - 1].rstrip()
+    if " " in shortened:
+        shortened = shortened.rsplit(" ", 1)[0]
+    return f"{shortened.rstrip(',.…')}…"
+
+
+def concise_summary(selected: SelectedArticle) -> str:
+    extracted = extractive_summary(selected)
+    if extracted is not None:
+        return _truncate_naturally(_normalized_text(extracted), _SUMMARY_LIMIT)
+    title = _normalized_text(selected.article.title).rstrip(".!?。！？")
+    suffix = " 관련 소식임"
+    title_part = _truncate_naturally(title, _SUMMARY_LIMIT - len(suffix))
+    return f"{title_part}{suffix}"
+
+
 def render_briefing_html(
     groups: Mapping[OutputGroup, Sequence[SelectedArticle]], run_at: datetime
 ) -> str:
     if run_at.tzinfo is None or run_at.utcoffset() is None:
         raise ValueError("run_at must be timezone-aware")
     run_date = _kst_date(run_at)
-    header = "\n".join(
-        (
-            "출근 길, 오늘의 뉴스는? 💡",
-            f"{run_date:%Y.%m.%d}.({_WEEKDAYS[run_date.weekday()]})",
-            "",
-            "💬오늘의 한마디",
-            f'"{escape(_daily_quote(run_date))}"',
-        )
+    header = (
+        f"['{run_date:%y}.{run_date.month}.{run_date.day}."
+        f"({_WEEKDAYS[run_date.weekday()]}), 아침 언론 모니터 결과]"
     )
+    empty_labels = [label for group, label in _GROUP_LABELS if not groups.get(group, ())]
     blocks: list[str] = []
-    for group, heading in _SECTION_HEADINGS:
+    if empty_labels:
+        blocks.append(f"※ {', '.join(empty_labels)} 관련 보도 없음")
+    for group, label in _GROUP_LABELS:
         items = groups.get(group, ())
-        if not items:
-            blocks.append(f"{_DIVIDER}\n{heading}\n관련 기사 없음")
-            continue
-        items_blocks: list[str] = []
         for selected in items:
             article = selected.article
             title = escape(_normalized_text(article.title))
+            source = escape(_normalized_text(article.source.name))
             url = _normalized_text(article.url)
             escaped_url = escape(url, quote=True)
-            summary = extractive_summary(selected)
-            item_lines = [title]
-            if summary is not None:
-                item_lines.append(f"✅실무 참고 : {escape(_normalized_text(summary))}")
-            item_lines.append(f'🔗<a href="{escaped_url}">뉴스 기사 링크 바로가기</a>')
-            items_blocks.append("\n".join(item_lines))
-        blocks.append(f"{_DIVIDER}\n{heading}\n{'\n\n'.join(items_blocks)}")
+            summary = escape(concise_summary(selected))
+            blocks.append(
+                "\n".join(
+                    (
+                        f"■ [{label}] {title} ({source})",
+                        f'<a href="{escaped_url}">기사 링크 바로가기</a>',
+                        f"- {summary}",
+                    )
+                )
+            )
     return f"{header}\n\n{'\n\n'.join(blocks)}"
