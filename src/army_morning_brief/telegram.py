@@ -216,7 +216,7 @@ def send_telegram_message(
     text: str,
     client: httpx.Client | None = None,
     sleep: Callable[[float], None] | None = None,
-    max_retries: int = 2,
+    max_retries: int = 5,
 ) -> None:
     """Send HTML chunks to recipients in the supplied deterministic order."""
     if not token:
