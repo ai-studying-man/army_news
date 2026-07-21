@@ -51,6 +51,22 @@ DIPLOMACY_SECURITY_SEARCH_TERMS = (
     "핵심광물 공급망",
 )
 
+DEFENSE_SECURITY_SEARCH_TERMS = (
+    "국방부",
+    "합동참모본부",
+    "국방 안보",
+    "방산",
+    "방위사업",
+)
+
+COLUMN_EDITORIAL_SEARCH_TERMS = (
+    "군사 칼럼",
+    "국방 칼럼",
+    "안보 칼럼",
+    "북한 사설",
+    "외교 사설",
+)
+
 
 def build_google_news_url(terms: tuple[str, ...]) -> str:
     cleaned = tuple(term.strip() for term in terms if term.strip())
@@ -95,6 +111,16 @@ def configured_sources(config: BriefConfig) -> tuple[Source, ...]:
             name="Google 뉴스: 외교·안보",
             url=build_google_news_url(DIPLOMACY_SECURITY_SEARCH_TERMS),
             priority=50,
+        ),
+        Source(
+            name="Google 뉴스: 국방·안보",
+            url=build_google_news_url(DEFENSE_SECURITY_SEARCH_TERMS),
+            priority=50,
+        ),
+        Source(
+            name="Google 뉴스: 칼럼·사설",
+            url=build_google_news_url(COLUMN_EDITORIAL_SEARCH_TERMS),
+            priority=30,
         ),
     )
     return PUBLIC_RSS_SOURCES + build_google_news_sources(config) + diplomacy_sources

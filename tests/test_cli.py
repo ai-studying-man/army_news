@@ -38,15 +38,23 @@ def test_c001_daily_fixture_dry_run_renders_expected_briefing(
     captured = capsys.readouterr()
     assert result == 0
     assert captured.err == ""
-    assert captured.out.startswith("['26.7.18.(토), 아침 언론 모니터 결과]\n")
-    assert "■ [사단] 8사단 장병 안전교육 실시 (공개 언론사)\n" in captured.out
+    assert captured.out.startswith("💡26년 7월 18일(토) 육군 브리핑\n")
+    assert (
+        "[사단]\n"
+        "1. 25사단 장병 안전교육 실시 (공개 언론사)\n"
+        '<a href="https://news.example.test/division-safety">기사 링크 바로가기</a>'
+    ) in captured.out
     assert "https://news.example.test/division-safety" in captured.out
-    assert "- 장병 대상 안전 교육 &amp; 점검" in captured.out
-    assert "■ [지역] 양주시 군·관 재난대응 협력 (fixture)\n" in captured.out
+    assert "장병 대상 안전 교육 &amp; 점검" not in captured.out
+    assert (
+        "[지역]\n"
+        "1. 양주시 군·관 재난대응 협력 (fixture)\n"
+        '<a href="https://news.example.test/region-cooperation">기사 링크 바로가기</a>'
+    ) in captured.out
     assert "https://news.example.test/region-cooperation" in captured.out
-    assert "- 양주시와 군 관계자가 공개 훈련을 점검했다." in captured.out
-    assert "※ 외교/북한 관련 보도 없음" in captured.out
-    assert captured.out.index("■ [사단]") < captured.out.index("■ [지역]")
+    assert "양주시와 군 관계자가 공개 훈련을 점검했다." not in captured.out
+    assert "※ 육군, 군단, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음" in captured.out
+    assert captured.out.index("[사단]") < captured.out.index("[지역]")
     assert "출처:" not in captured.out
     assert "발행:" not in captured.out
     assert "원문 기사" not in captured.out
@@ -71,7 +79,7 @@ def test_delayed_run_keeps_fixed_0500_cutoff_and_boundary_region_article(
 
     captured = capsys.readouterr()
     assert result == 0
-    assert "■ [지역] 양주시 군·관 재난대응 협력" in captured.out
+    assert "[지역]\n1. 양주시 군·관 재난대응 협력" in captured.out
     assert "too-late" not in captured.out
 
 
@@ -95,7 +103,7 @@ def test_c002_adversarial_fixture_filters_invalid_and_escapes_html(
     assert "양주 가격 상승" not in output
     assert output.count("중복 사건") == 1
     assert "정상 별도 기사 &lt;확인&gt;" in output
-    assert "공개 자료 &lt;검토&gt; &amp; 후속 발표" in output
+    assert "공개 자료 &lt;검토&gt; &amp; 후속 발표" not in output
     assert 'href="https://news.example.test/distinct"' in output
 
 
@@ -112,7 +120,7 @@ def test_now_requires_valid_aware_iso8601(now: str) -> None:
         ["--fixture", _fixture("daily_feed.xml"), "--now", NOW],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--send", "--now", NOW],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "0"],
-        ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "6"],
+        ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "101"],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--token", "secret"],
     ],
 )

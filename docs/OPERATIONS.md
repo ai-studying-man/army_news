@@ -82,19 +82,20 @@ step and are never command-line arguments.
 ## Message format and duplicate handling
 
 Keep only the representative original article for each incident; do not send syndicated duplicates.
-The message begins with the KST short date and weekday. Empty groups are combined in one `※` notice.
-Articles are ordered by division, region, and diplomacy/North Korea. Each item uses `■ [group] title
-(publisher)`, a clickable link, and a `-` summary of at most 50 characters. A genuine RSS description
-provides the first sentence; a title-only feed produces a conservative title-fact summary.
+The message begins with the KST short date, weekday, and a deterministic `💬오늘의 한마디`.
+Empty groups are combined in one `※` notice. Articles are unlimited and ordered by corps, division,
+region, Army, defense/security, diplomacy/North Korea, and column/editorial. Each item uses
+`[group] title (publisher)` and a clickable link. A genuine RSS description contributes a `-` summary
+of at most 50 characters only when it adds information beyond the title; title-only or repetitive
+descriptions produce no summary line.
 
 ```text
 ['26.7.20.(월), 아침 언론 모니터 결과]
 
 ※ 지역 관련 보도 없음
 
-■ [사단] 기사 제목 (언론사)
+[사단] 기사 제목 (언론사)
 <a href="https://example.com/article">기사 링크 바로가기</a>
-- 기사 내용을 50자 이내로 요약한 문장
 ```
 
 ## Duplicate guard and delivery limits

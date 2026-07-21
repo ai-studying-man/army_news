@@ -261,9 +261,13 @@ def _published_timestamp(value: datetime) -> float:
 def _ranking_key(selected: SelectedArticle) -> tuple[object, ...]:
     article = selected.article
     group_rank = {
-        OutputGroup.DIVISION: 0,
-        OutputGroup.REGION: 1,
-        OutputGroup.DIPLOMACY_NORTH_KOREA: 2,
+        OutputGroup.ARMY: 0,
+        OutputGroup.CORPS: 1,
+        OutputGroup.DIVISION: 2,
+        OutputGroup.REGION: 3,
+        OutputGroup.DEFENSE_SECURITY: 4,
+        OutputGroup.DIPLOMACY_NORTH_KOREA: 5,
+        OutputGroup.COLUMN_EDITORIAL: 6,
     }
     return (
         group_rank[selected.classification.group],
@@ -281,10 +285,10 @@ def select_articles(
     articles: Iterable[Article],
     config: BriefConfig,
     *,
-    per_group_limit: int = 5,
+    per_group_limit: int | None = None,
 ) -> dict[OutputGroup, tuple[SelectedArticle, ...]]:
     """Classify, deduplicate, rank, and cap collected articles."""
-    if per_group_limit < 1:
+    if per_group_limit is not None and per_group_limit < 1:
         raise ValueError("per_group_limit must be positive")
 
     classified = [
@@ -315,5 +319,8 @@ def select_articles(
             (item for item in representatives if item.classification.group is group),
             key=_ranking_key,
         )
-        result_groups[group] = tuple(group_items[:per_group_limit])
+        selected_group_items = (
+            group_items if per_group_limit is None else group_items[:per_group_limit]
+        )
+        result_groups[group] = tuple(selected_group_items)
     return result_groups

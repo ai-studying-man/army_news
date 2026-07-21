@@ -232,6 +232,20 @@ _DIPLOMACY_SECURITY_CONTEXT_TERMS = (
     "핵시설",
 )
 
+_DEFENSE_SECURITY_TERMS = (
+    "국방부",
+    "국방",
+    "합참",
+    "합동참모본부",
+    "안보",
+    "k방산",
+    "방산",
+    "방위사업",
+    "군사안보",
+)
+_COLUMN_EDITORIAL_TERMS = ("[칼럼]", "[사설]", "칼럼", "사설", "기고", "오피니언")
+_KIM_JONG_UN_HOMONYM_TERMS = ("교수", "학과", "생방송", "오늘아침")
+
 _PARTICLE_SUFFIXES = (
     "으로부터",
     "에게서",
@@ -279,9 +293,13 @@ _REGION_ADMIN_SUFFIX_PATTERN = "(?:" + "|".join(_REGION_ADMIN_SUFFIXES) + ")?"
 
 
 class OutputGroup(StrEnum):
+    CORPS = "군단"
     DIVISION = "사단"
     REGION = "지역"
+    ARMY = "육군"
+    DEFENSE_SECURITY = "국방·안보"
     DIPLOMACY_NORTH_KOREA = "외교·북한"
+    COLUMN_EDITORIAL = "칼럼·사설"
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,15 +411,37 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
         return None
     if _is_personal_nostalgia(context):
         return None
+    if "김정은" in context and _contains_any_stem(context, _KIM_JONG_UN_HOMONYM_TERMS):
+        return None
+
+    column_match = next(
+        (term for term in _COLUMN_EDITORIAL_TERMS if term.casefold() in article.title.casefold()),
+        None,
+    )
+    if column_match is not None:
+        return ClassificationResult(OutputGroup.COLUMN_EDITORIAL, column_match)
 
     general_army_aliases: list[str] = []
+    direct_corps_alias: str | None = None
     direct_division_alias: str | None = None
     for rule in config.divisions:
         for alias in rule.aliases:
             if alias.casefold() == "육군":
                 general_army_aliases.append(alias)
+            elif (
+                direct_corps_alias is None
+                and "군단" in alias
+                and _contains_token(context, alias)
+            ):
+                direct_corps_alias = alias
             elif direct_division_alias is None and _contains_token(context, alias):
                 direct_division_alias = alias
+
+    if direct_corps_alias is not None:
+        return ClassificationResult(
+            group=OutputGroup.CORPS,
+            matched_term=direct_corps_alias,
+        )
 
     # A configured unit alias is a direct monitoring target; only the broad
     # ``육군`` alias needs an additional Army-work relevance cue below.
@@ -415,9 +455,11 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
     if region_result is not None:
         return region_result
 
-    diplomacy_result = _classify_diplomacy_north_korea(context)
-    if diplomacy_result is not None:
-        return diplomacy_result
+    north_korea_match = next(
+        (term for term in _NORTH_KOREA_TERMS if _contains_token(context, term)), None
+    )
+    if north_korea_match is not None:
+        return ClassificationResult(OutputGroup.DIPLOMACY_NORTH_KOREA, north_korea_match)
 
     if (
         general_army_aliases
@@ -425,7 +467,17 @@ def classify_article(article: Article, config: BriefConfig) -> ClassificationRes
         and _has_army_work_context(context)
     ):
         return ClassificationResult(
-            group=OutputGroup.DIVISION,
+            group=OutputGroup.ARMY,
             matched_term=general_army_aliases[0],
         )
+
+    defense_match = next(
+        (term for term in _DEFENSE_SECURITY_TERMS if _contains_token(context, term)), None
+    )
+    if defense_match is not None:
+        return ClassificationResult(OutputGroup.DEFENSE_SECURITY, defense_match)
+
+    diplomacy_result = _classify_diplomacy_north_korea(context)
+    if diplomacy_result is not None:
+        return diplomacy_result
     return None

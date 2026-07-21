@@ -3,12 +3,20 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from army_morning_brief.classification import OutputGroup
-from army_morning_brief.config import BriefConfig
+from army_morning_brief.config import BriefConfig, DivisionRule
 from army_morning_brief.models import Article, Source
 from army_morning_brief.pipeline import select_articles
 
 KST = timezone(timedelta(hours=9))
-CONFIG = BriefConfig.default()
+CONFIG = BriefConfig(
+    divisions=(
+        DivisionRule(
+            "legacy test unit",
+            ("육군", "8사단", "8기동사단", "3070부대", "오뚜기부대"),
+            ("양주", "동두천", "포천", "연천", "의정부"),
+        ),
+    )
+)
 
 
 def article(
@@ -268,7 +276,7 @@ def test_similar_but_distinct_events_are_not_deduplicated(first: str, second: st
     assert sum(map(len, selected.values())) == 2
 
 
-def test_group_limit_and_deterministic_repeat_order() -> None:
+def test_unlimited_default_and_optional_group_limit_keep_deterministic_order() -> None:
     items = tuple(
         article(
             f"포천 육군 장병 안전 점검 {index}",
@@ -283,12 +291,14 @@ def test_group_limit_and_deterministic_repeat_order() -> None:
 
     first = select_articles(items, CONFIG)
     second = select_articles(reversed(items), CONFIG)
+    capped = select_articles(items, CONFIG, per_group_limit=5)
 
     first_urls = [item.article.url for item in first[OutputGroup.REGION]]
     second_urls = [item.article.url for item in second[OutputGroup.REGION]]
-    assert len(first_urls) == 5
+    assert len(first_urls) == 7
     assert first_urls == second_urls
     assert first_urls[0] == "https://news.example/6"
+    assert len(capped[OutputGroup.REGION]) == 5
 
 
 def test_invalid_group_limit_is_rejected() -> None:

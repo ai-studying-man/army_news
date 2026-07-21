@@ -59,9 +59,9 @@ class BriefConfig:
         return cls(
             divisions=(
                 DivisionRule(
-                    name="제8기동사단",
-                    aliases=("육군", "8사단", "8기동사단", "3070부대", "오뚜기부대"),
-                    regions=("양주", "동두천", "포천", "연천", "의정부"),
+                    name="제25보병사단",
+                    aliases=("육군", "1군단", "제1군단", "25사단", "제25보병사단", "비룡부대"),
+                    regions=("연천", "파주", "양주"),
                 ),
             )
         )

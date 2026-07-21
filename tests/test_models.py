@@ -105,8 +105,8 @@ def test_window_rejects_naive_run_and_candidate_times() -> None:
 def test_default_config_uses_prompt_aliases_and_regions() -> None:
     rule = BriefConfig.default().divisions[0]
 
-    assert rule.aliases == ("육군", "8사단", "8기동사단", "3070부대", "오뚜기부대")
-    assert rule.regions == ("양주", "동두천", "포천", "연천", "의정부")
+    assert rule.aliases == ("육군", "1군단", "제1군단", "25사단", "제25보병사단", "비룡부대")
+    assert rule.regions == ("연천", "파주", "양주")
 
 
 def test_config_accepts_mapping_and_environment_json_overrides() -> None:

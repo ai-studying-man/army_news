@@ -42,7 +42,7 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--send", action="store_true", help="send the briefing to Telegram")
     parser.add_argument("--fixture", type=Path, help="read one local RSS fixture")
     parser.add_argument("--now", type=_aware_iso8601, default=datetime.now(KST))
-    parser.add_argument("--max-per-group", type=int, choices=range(1, 6), default=5)
+    parser.add_argument("--max-per-group", type=int, choices=range(1, 101))
     return parser
 
 
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     fixture = cast(Path | None, arguments.fixture)
     run_at = cast(datetime, arguments.now)
-    max_per_group = cast(int, arguments.max_per_group)
+    max_per_group = cast(int | None, arguments.max_per_group)
     send = cast(bool, arguments.send)
 
     token: str | None = None
