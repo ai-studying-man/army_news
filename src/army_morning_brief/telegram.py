@@ -215,7 +215,9 @@ def _send_one(
         if response.status_code == 429:
             raise TelegramDeliveryError("Telegram rate limit exceeded")
         if not 200 <= response.status_code < 300:
-            raise TelegramDeliveryError("Telegram request failed")
+            raise TelegramDeliveryError(
+                f"Telegram request failed (HTTP {response.status_code})"
+            )
         raise TelegramDeliveryError("Telegram rejected the message")
 
 
