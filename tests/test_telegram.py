@@ -255,3 +255,16 @@ def test_astral_emoji_are_counted_as_two_telegram_utf16_units() -> None:
     assert len(chunks) == 2
     assert "".join(chunks) == source
     assert all(len(chunk.encode("utf-16-le")) // 2 <= 4096 for chunk in chunks)
+
+
+def test_long_link_targets_also_respect_the_serialized_limit() -> None:
+    source = "\n".join(
+        f'<a href="https://example.invalid/{"x" * 600}/{index}">기사 링크 바로가기</a>'
+        for index in range(20)
+    )
+
+    chunks = split_html_message(source, limit=3500)
+
+    assert len(chunks) > 1
+    assert all(len(chunk.encode("utf-16-le")) // 2 <= 3500 for chunk in chunks)
+    assert "".join(_visible_text(chunk) for chunk in chunks) == _visible_text(source)

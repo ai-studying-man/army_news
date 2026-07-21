@@ -65,7 +65,7 @@ def parse_chat_ids(value: str) -> tuple[str, ...]:
 
 
 def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
-    """Split HTML on Telegram's UTF-16 units while preserving active tags."""
+    """Split HTML on visible and serialized UTF-16 units, preserving active tags."""
     if limit < 1:
         raise ValueError("message limit must be positive")
     if not text:
@@ -80,15 +80,32 @@ def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
     open_tags: list[tuple[str, str]] = []
     visible_count = 0
 
+    def units(value: str) -> int:
+        return len(value.encode("utf-16-le")) // 2
+
+    def closing_markup(tags: list[tuple[str, str]] | None = None) -> str:
+        active_tags = open_tags if tags is None else tags
+        return "".join(f"</{name}>" for name, _raw in reversed(active_tags))
+
+    def serialized_capacity() -> int:
+        return limit - units("".join(current)) - units(closing_markup())
+
     def flush() -> None:
         nonlocal current, visible_count
-        current.extend(f"</{name}>" for name, _raw in reversed(open_tags))
+        current.append(closing_markup())
         chunks.append("".join(current))
         current = [raw for _name, raw in open_tags]
         visible_count = 0
 
     for token in parser.tokens:
         if token.starts is not None:
+            candidate_tags = [*open_tags, token.starts]
+            projected = "".join(current) + token.raw + closing_markup(candidate_tags)
+            if units(projected) > limit and visible_count:
+                flush()
+                projected = "".join(current) + token.raw + closing_markup(candidate_tags)
+            if units(projected) > limit:
+                raise ValueError("HTML tag exceeds the Telegram message limit")
             current.append(token.raw)
             open_tags.append(token.starts)
             continue
@@ -103,13 +120,17 @@ def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
 
         remaining = token.raw
         while remaining:
-            capacity = limit - visible_count
-            if capacity == 0:
+            capacity = min(limit - visible_count, serialized_capacity())
+            if capacity <= 0:
                 flush()
-                capacity = limit
+                capacity = min(limit, serialized_capacity())
 
             # Entity tokens represent one visible character and must stay atomic.
             if token.entity:
+                if units(remaining) > capacity:
+                    flush()
+                    if units(remaining) > serialized_capacity():
+                        raise ValueError("HTML entity exceeds the Telegram message limit")
                 current.append(remaining)
                 visible_count += 1
                 remaining = ""
@@ -118,10 +139,10 @@ def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
             used = 0
             cut = 0
             for character in remaining:
-                units = len(character.encode("utf-16-le")) // 2
-                if used + units > capacity:
+                character_units = units(character)
+                if used + character_units > capacity:
                     break
-                used += units
+                used += character_units
                 cut += 1
             if cut == 0:
                 flush()
@@ -131,11 +152,11 @@ def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
                 if newline >= 0:
                     cut = newline + 1
             current.append(remaining[:cut])
-            visible_count += len(remaining[:cut].encode("utf-16-le")) // 2
+            visible_count += units(remaining[:cut])
             remaining = remaining[cut:]
 
     if current:
-        current.extend(f"</{name}>" for name, _raw in reversed(open_tags))
+        current.append(closing_markup())
         chunks.append("".join(current))
     return tuple(chunks)
 
