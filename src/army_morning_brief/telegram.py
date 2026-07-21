@@ -12,6 +12,7 @@ import httpx
 
 _SEND_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 _MAX_RETRY_DELAY_SECONDS = 60.0
+_SAFE_MESSAGE_LIMIT = 3500
 
 
 class TelegramDeliveryError(RuntimeError):
@@ -239,7 +240,7 @@ def send_telegram_message(
     if not recipients or any(not recipient for recipient in recipients):
         raise ValueError("at least one Telegram chat ID is required")
 
-    chunks = split_html_message(text)
+    chunks = split_html_message(text, limit=_SAFE_MESSAGE_LIMIT)
     sleeper = sleep if sleep is not None else time.sleep
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     owned_client = client is None
