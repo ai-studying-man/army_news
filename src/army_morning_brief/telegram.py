@@ -10,7 +10,7 @@ from typing import cast
 
 import httpx
 
-_SEND_TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=15.0, pool=5.0)
+_SEND_TIMEOUT = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0)
 _MAX_RETRY_DELAY_SECONDS = 60.0
 
 
@@ -183,6 +183,10 @@ def _send_one(
                 timeout=_SEND_TIMEOUT,
             )
         except httpx.HTTPError:
+            if retries < max_retries:
+                sleep(min(2.0**retries, 8.0))
+                retries += 1
+                continue
             raise TelegramDeliveryError("Telegram request failed") from None
 
         data = _response_data(response)

@@ -64,10 +64,10 @@ def test_success_uses_https_html_payload_and_explicit_timeout() -> None:
     assert request.url.scheme == "https"
     assert request.method == "POST"
     assert request.extensions["timeout"] == {
-        "connect": 5.0,
-        "read": 15.0,
-        "write": 15.0,
-        "pool": 5.0,
+        "connect": 10.0,
+        "read": 30.0,
+        "write": 30.0,
+        "pool": 10.0,
     }
     assert _json_body(request) == {
         "chat_id": CHAT,
@@ -152,12 +152,43 @@ def test_transport_timeout_is_sanitized() -> None:
         raise httpx.ReadTimeout(f"timeout at {leaked_url}", request=request)
 
     with _client(handler) as client, pytest.raises(TelegramDeliveryError) as caught:
-        send_telegram_message(token=TOKEN, chat_ids=CHAT, text="brief", client=client)
+        send_telegram_message(
+            token=TOKEN,
+            chat_ids=CHAT,
+            text="brief",
+            client=client,
+            max_retries=0,
+        )
 
     assert str(caught.value) == "Telegram request failed"
     assert TOKEN not in str(caught.value)
     assert CHAT not in str(caught.value)
     assert leaked_url not in str(caught.value)
+
+
+def test_transient_transport_error_is_retried() -> None:
+    attempts = 0
+    sleeps: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise httpx.ReadTimeout("temporary timeout", request=request)
+        return httpx.Response(200, json={"ok": True})
+
+    with _client(handler) as client:
+        send_telegram_message(
+            token=TOKEN,
+            chat_ids=CHAT,
+            text="brief",
+            client=client,
+            sleep=sleeps.append,
+            max_retries=1,
+        )
+
+    assert attempts == 2
+    assert sleeps == [1.0]
 
 
 def test_comma_separated_chat_ids_remain_opaque_and_send_in_order() -> None:
