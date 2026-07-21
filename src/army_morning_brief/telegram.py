@@ -169,6 +169,18 @@ def _migrated_chat_id(data: dict[str, object]) -> str | None:
     return str(value)
 
 
+def _bad_request_reason(data: dict[str, object]) -> str:
+    description = data.get("description")
+    normalized = description.lower() if isinstance(description, str) else ""
+    if "chat not found" in normalized:
+        return "chat not found"
+    if "message is too long" in normalized:
+        return "message too long"
+    if "parse entities" in normalized:
+        return "invalid message markup"
+    return "invalid request"
+
+
 def _send_one(
     *,
     client: httpx.Client,
@@ -215,6 +227,10 @@ def _send_one(
             continue
         if response.status_code == 429:
             raise TelegramDeliveryError("Telegram rate limit exceeded")
+        if response.status_code == 400:
+            raise TelegramDeliveryError(
+                f"Telegram rejected the request ({_bad_request_reason(data)})"
+            )
         if not 200 <= response.status_code < 300:
             raise TelegramDeliveryError(
                 f"Telegram request failed (HTTP {response.status_code})"
