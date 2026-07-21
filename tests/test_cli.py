@@ -120,7 +120,7 @@ def test_now_requires_valid_aware_iso8601(now: str) -> None:
         ["--fixture", _fixture("daily_feed.xml"), "--now", NOW],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--send", "--now", NOW],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "0"],
-        ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "101"],
+        ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--max-per-group", "6"],
         ["--fixture", _fixture("daily_feed.xml"), "--dry-run", "--token", "secret"],
     ],
 )

@@ -18,7 +18,7 @@ from army_morning_brief.collector import (
 )
 from army_morning_brief.config import KST, BriefConfig, CollectionWindow, kst_collection_window
 from army_morning_brief.models import Article, Source
-from army_morning_brief.pipeline import select_articles
+from army_morning_brief.pipeline import MAX_ARTICLES_PER_GROUP, select_articles
 from army_morning_brief.sources import configured_sources
 from army_morning_brief.telegram import TelegramDeliveryError, send_telegram_message
 
@@ -42,7 +42,12 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--send", action="store_true", help="send the briefing to Telegram")
     parser.add_argument("--fixture", type=Path, help="read one local RSS fixture")
     parser.add_argument("--now", type=_aware_iso8601, default=datetime.now(KST))
-    parser.add_argument("--max-per-group", type=int, choices=range(1, 101))
+    parser.add_argument(
+        "--max-per-group",
+        type=int,
+        choices=range(1, MAX_ARTICLES_PER_GROUP + 1),
+        default=MAX_ARTICLES_PER_GROUP,
+    )
     return parser
 
 
@@ -61,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     fixture = cast(Path | None, arguments.fixture)
     run_at = cast(datetime, arguments.now)
-    max_per_group = cast(int | None, arguments.max_per_group)
+    max_per_group = cast(int, arguments.max_per_group)
     send = cast(bool, arguments.send)
 
     token: str | None = None

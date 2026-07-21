@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from army_morning_brief.classification import (
@@ -53,6 +54,22 @@ _VOLATILE_COUNT_TERMS = (
     "실종",
     "캠핑객",
 )
+MAX_ARTICLES_PER_GROUP = 5
+_INCIDENT_CONCEPTS = (
+    ("경보", "주의보"),
+    ("홍수", "범람"),
+    ("호우", "폭우", "집중호우"),
+    ("침수", "물바다"),
+    ("산불", "화재"),
+    ("지진",),
+    ("태풍",),
+    ("폭설", "대설"),
+    ("붕괴",),
+    ("대피", "피난"),
+)
+_PLACE_SUFFIXES = ("강", "교", "댐", "천", "산", "시", "구", "읍", "면", "동")
+_NON_PLACE_TERMS = frozenset({"육군", "미군", "한국군", "국방부", "군부대"})
+_INCIDENT_REWRITE_THRESHOLD = 0.3
 _EVENT_BOILERPLATE_TERMS = frozenset(
     {
         "관련",
@@ -182,6 +199,40 @@ def _ngrams(article: Article, size: int = 3) -> set[str]:
     return {compact[index : index + size] for index in range(len(compact) - size + 1)}
 
 
+def _place_roots(article: Article) -> set[str]:
+    roots: set[str] = set()
+    for term in _terms(article):
+        normalized = _normalize_term(term)
+        if normalized in _NON_PLACE_TERMS:
+            continue
+        for suffix in _PLACE_SUFFIXES:
+            if normalized.endswith(suffix) and len(normalized) >= len(suffix) + 2:
+                roots.add(normalized[: -len(suffix)])
+                break
+    return roots
+
+
+def _compact_title(article: Article) -> str:
+    return "".join(_WORD_PATTERN.findall(article.title.casefold()))
+
+
+def _incident_rewrite_similarity(left: Article, right: Article) -> float:
+    left_title = _compact_title(left)
+    right_title = _compact_title(right)
+    if not left_title or not right_title:
+        return 0.0
+    left_text = "".join(_WORD_PATTERN.findall(_text(left)))
+    right_text = "".join(_WORD_PATTERN.findall(_text(right)))
+    shared_concepts = sum(
+        any(keyword in left_text for keyword in concept)
+        and any(keyword in right_text for keyword in concept)
+        for concept in _INCIDENT_CONCEPTS
+    )
+    if shared_concepts < 2:
+        return 0.0
+    return SequenceMatcher(None, left_title, right_title, autojunk=False).ratio()
+
+
 def _overlap(left: set[str], right: set[str]) -> float:
     if not left or not right:
         return 0.0
@@ -207,6 +258,11 @@ def _has_distinct_dimensions(left: Article, right: Article, config: BriefConfig)
         right_values = {value for value in values if value.casefold() in right_text}
         if left_values and right_values and left_values.isdisjoint(right_values):
             return True
+
+    left_places = _place_roots(left)
+    right_places = _place_roots(right)
+    if left_places and right_places and left_places.isdisjoint(right_places):
+        return True
 
     for alternatives in _STATE_DIMENSIONS:
         left_state = _exclusive_state(left_text, alternatives)
@@ -242,7 +298,9 @@ def _same_event(left: Article, right: Article, config: BriefConfig) -> bool:
     right_anchors = _meaningful_terms(right, config)
     shared_anchors = left_anchors & right_anchors
     if not shared_anchors:
-        return False
+        return _incident_rewrite_similarity(left, right) >= _INCIDENT_REWRITE_THRESHOLD
+    if _incident_rewrite_similarity(left, right) >= _INCIDENT_REWRITE_THRESHOLD:
+        return True
     if len(shared_anchors) >= 3:
         return True
     if len(shared_anchors) >= 2 and all(
@@ -285,11 +343,11 @@ def select_articles(
     articles: Iterable[Article],
     config: BriefConfig,
     *,
-    per_group_limit: int | None = None,
+    per_group_limit: int = MAX_ARTICLES_PER_GROUP,
 ) -> dict[OutputGroup, tuple[SelectedArticle, ...]]:
     """Classify, deduplicate, rank, and cap collected articles."""
-    if per_group_limit is not None and per_group_limit < 1:
-        raise ValueError("per_group_limit must be positive")
+    if not 1 <= per_group_limit <= MAX_ARTICLES_PER_GROUP:
+        raise ValueError(f"per_group_limit must be between 1 and {MAX_ARTICLES_PER_GROUP}")
 
     classified = [
         SelectedArticle(article, result)
@@ -319,8 +377,5 @@ def select_articles(
             (item for item in representatives if item.classification.group is group),
             key=_ranking_key,
         )
-        selected_group_items = (
-            group_items if per_group_limit is None else group_items[:per_group_limit]
-        )
-        result_groups[group] = tuple(selected_group_items)
+        result_groups[group] = tuple(group_items[:per_group_limit])
     return result_groups

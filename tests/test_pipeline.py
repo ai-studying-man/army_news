@@ -276,7 +276,7 @@ def test_similar_but_distinct_events_are_not_deduplicated(first: str, second: st
     assert sum(map(len, selected.values())) == 2
 
 
-def test_unlimited_default_and_optional_group_limit_keep_deterministic_order() -> None:
+def test_default_group_limit_is_five_and_smaller_limit_keeps_deterministic_order() -> None:
     items = tuple(
         article(
             f"포천 육군 장병 안전 점검 {index}",
@@ -291,16 +291,51 @@ def test_unlimited_default_and_optional_group_limit_keep_deterministic_order() -
 
     first = select_articles(items, CONFIG)
     second = select_articles(reversed(items), CONFIG)
-    capped = select_articles(items, CONFIG, per_group_limit=5)
+    capped = select_articles(items, CONFIG, per_group_limit=3)
 
     first_urls = [item.article.url for item in first[OutputGroup.REGION]]
     second_urls = [item.article.url for item in second[OutputGroup.REGION]]
-    assert len(first_urls) == 7
+    assert len(first_urls) == 5
     assert first_urls == second_urls
     assert first_urls[0] == "https://news.example/6"
-    assert len(capped[OutputGroup.REGION]) == 5
+    assert len(capped[OutputGroup.REGION]) == 3
+
+
+def test_flood_alert_headline_rewrites_collapse_to_one_event() -> None:
+    items = (
+        article(
+            "연천 임진강 홍수경보",
+            description="임진강 수위 상승으로 홍수경보가 발령됐다.",
+            url="https://preferred.example/flood",
+            priority=10,
+        ),
+        article(
+            "연천 임진교 일대 홍수경보 발령",
+            description="임진교 일대에 홍수경보가 내려졌다.",
+            url="https://rewrite.example/flood",
+        ),
+        article(
+            "연천 임진강 홍수주의보 격상",
+            description="임진강 홍수주의보가 격상됐다.",
+            url="https://update.example/flood",
+        ),
+        article(
+            "포천 한탄강 홍수경보 발령",
+            description="한탄강 수위 상승으로 홍수경보가 내려졌다.",
+            url="https://distinct.example/flood",
+        ),
+    )
+
+    selected = select_articles(items, CONFIG)
+
+    assert [item.article.url for item in selected[OutputGroup.REGION]] == [
+        "https://preferred.example/flood",
+        "https://distinct.example/flood",
+    ]
 
 
 def test_invalid_group_limit_is_rejected() -> None:
-    with pytest.raises(ValueError, match="positive"):
+    with pytest.raises(ValueError, match="between"):
         select_articles((), CONFIG, per_group_limit=0)
+    with pytest.raises(ValueError, match="between"):
+        select_articles((), CONFIG, per_group_limit=6)
