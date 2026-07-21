@@ -64,7 +64,7 @@ def parse_chat_ids(value: str) -> tuple[str, ...]:
 
 
 def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
-    """Split HTML on visible characters while closing and reopening active tags."""
+    """Split HTML on Telegram's UTF-16 units while preserving active tags."""
     if limit < 1:
         raise ValueError("message limit must be positive")
     if not text:
@@ -114,13 +114,23 @@ def split_html_message(text: str, *, limit: int = 4096) -> tuple[str, ...]:
                 remaining = ""
                 continue
 
-            cut = min(capacity, len(remaining))
-            if len(remaining) > capacity:
-                newline = remaining.rfind("\n", 0, capacity + 1)
+            used = 0
+            cut = 0
+            for character in remaining:
+                units = len(character.encode("utf-16-le")) // 2
+                if used + units > capacity:
+                    break
+                used += units
+                cut += 1
+            if cut == 0:
+                flush()
+                continue
+            if cut < len(remaining):
+                newline = remaining.rfind("\n", 0, cut + 1)
                 if newline >= 0:
                     cut = newline + 1
             current.append(remaining[:cut])
-            visible_count += cut
+            visible_count += len(remaining[:cut].encode("utf-16-le")) // 2
             remaining = remaining[cut:]
 
     if current:

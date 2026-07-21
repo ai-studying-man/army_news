@@ -221,7 +221,10 @@ def test_long_korean_emoji_html_is_split_without_content_loss_or_broken_links() 
     chunks = split_html_message(source)
 
     assert len(chunks) >= 2
-    assert all(len(_visible_text(chunk)) <= 4096 for chunk in chunks)
+    assert all(
+        len(_visible_text(chunk).encode("utf-16-le")) // 2 <= 4096
+        for chunk in chunks
+    )
     assert "".join(_visible_text(chunk) for chunk in chunks) == _visible_text(source)
     assert all(
         chunk.count('<a href="https://example.invalid/report?x=1&amp;y=2">') == chunk.count("</a>")
@@ -242,3 +245,13 @@ def test_caller_escaped_html_like_text_stays_escaped() -> None:
 
     assert bodies[0]["text"] == escaped
     assert "<script" not in cast(str, bodies[0]["text"])
+
+
+def test_astral_emoji_are_counted_as_two_telegram_utf16_units() -> None:
+    source = "💡" * 3000
+
+    chunks = split_html_message(source)
+
+    assert len(chunks) == 2
+    assert "".join(chunks) == source
+    assert all(len(chunk.encode("utf-16-le")) // 2 <= 4096 for chunk in chunks)
