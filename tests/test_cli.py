@@ -53,7 +53,7 @@ def test_c001_daily_fixture_dry_run_renders_expected_briefing(
     ) in captured.out
     assert "https://news.example.test/region-cooperation" in captured.out
     assert "양주시와 군 관계자가 공개 훈련을 점검했다." not in captured.out
-    assert "※ 육군, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음" in captured.out
+    assert "관련 보도 없음" not in captured.out
     assert captured.out.index("📍 [지역]") < captured.out.index("🎖️ [군단·사단]")
     assert "출처:" not in captured.out
     assert "발행:" not in captured.out

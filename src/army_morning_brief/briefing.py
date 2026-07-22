@@ -17,6 +17,7 @@ _SECTIONS = (
     ((OutputGroup.DIPLOMACY_NORTH_KOREA,), "외교·북한", "🌐"),
     ((OutputGroup.COLUMN_EDITORIAL,), "칼럼·사설", "📰"),
 )
+_NO_REPORT_NOTICE_LABELS = frozenset({"지역", "군단·사단"})
 _SUMMARY_LIMIT = 50
 _FLOW_PHRASES = (
     "오늘은 관련 보도가 없습니다.",
@@ -119,7 +120,7 @@ def render_briefing_html(
     empty_labels = [
         label
         for section_groups, label, _emoji in _SECTIONS
-        if not _section_items(groups, section_groups)
+        if label in _NO_REPORT_NOTICE_LABELS and not _section_items(groups, section_groups)
     ]
     blocks: list[str] = []
     if empty_labels:

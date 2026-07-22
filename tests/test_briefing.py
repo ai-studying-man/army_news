@@ -112,7 +112,7 @@ def test_renderer_uses_final_digest_template_and_escapes_dynamic_html() -> None:
     )
 
     assert html.startswith("💡26년 7월 19일(일) 언론 모니터링 결과\n\n")
-    assert "※ 육군, 국방·안보, 칼럼·사설 관련 보도 없음" in html
+    assert "관련 보도 없음" not in html
     assert html.index("📍 [지역]") < html.index("🎖️ [군단·사단]")
     assert html.index("🎖️ [군단·사단]") < html.index("🌐 [외교·북한]")
     assert (
@@ -161,7 +161,7 @@ def test_renderer_combines_empty_groups_in_notice() -> None:
     html = render_briefing_html({}, datetime(2026, 7, 19, 6, tzinfo=KST))
 
     assert html.startswith("💡26년 7월 19일(일) 언론 모니터링 결과\n\n💬오늘의 한마디 : ")
-    assert "※ 지역, 육군, 군단·사단, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음" in html
+    assert "※ 지역, 군단·사단 관련 보도 없음" in html
 
 
 def test_renderer_uses_requested_date_and_flow_phrase() -> None:
@@ -255,7 +255,7 @@ def test_renderer_combines_empty_notice_omits_empty_headers_and_summaries() -> N
         datetime(2026, 7, 22, 8, tzinfo=KST),
     )
 
-    notice = "※ 지역, 육군, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음"
+    notice = "※ 지역 관련 보도 없음"
     assert html.index(notice) < html.index("🎖️ [군단·사단]")
     assert "📍 [지역]" not in html
     assert "🪖 [육군]" not in html
