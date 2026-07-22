@@ -5,18 +5,17 @@ from html import escape
 
 from army_morning_brief.classification import OutputGroup
 from army_morning_brief.config import KST
-from army_morning_brief.pipeline import SelectedArticle
+from army_morning_brief.pipeline import MAX_ARTICLES_PER_GROUP, SelectedArticle
 
 _SENTENCE_PATTERN = re.compile(r".*?[.!?。！？](?=\s|$)|.+$", re.DOTALL)
 _WEEKDAYS = ("월", "화", "수", "목", "금", "토", "일")
-_GROUP_LABELS = (
-    (OutputGroup.ARMY, "육군"),
-    (OutputGroup.CORPS, "군단"),
-    (OutputGroup.DIVISION, "사단"),
-    (OutputGroup.REGION, "지역"),
-    (OutputGroup.DEFENSE_SECURITY, "국방·안보"),
-    (OutputGroup.DIPLOMACY_NORTH_KOREA, "외교·북한"),
-    (OutputGroup.COLUMN_EDITORIAL, "칼럼·사설"),
+_SECTIONS = (
+    ((OutputGroup.REGION,), "지역", "📍"),
+    ((OutputGroup.ARMY,), "육군", "🪖"),
+    ((OutputGroup.CORPS, OutputGroup.DIVISION), "군단·사단", "🎖️"),
+    ((OutputGroup.DEFENSE_SECURITY,), "국방·안보", "🛡️"),
+    ((OutputGroup.DIPLOMACY_NORTH_KOREA,), "외교·북한", "🌐"),
+    ((OutputGroup.COLUMN_EDITORIAL,), "칼럼·사설", "📰"),
 )
 _SUMMARY_LIMIT = 50
 _FLOW_PHRASES = (
@@ -41,9 +40,7 @@ def _is_redundant_description(selected: SelectedArticle, description: str) -> bo
     if comparable_description == title.casefold():
         return True
     comparison_title = re.sub(r"[^0-9a-z가-힣]", "", title.casefold())
-    comparison_description = re.sub(
-        r"[^0-9a-z가-힣]", "", comparable_description.casefold()
-    )
+    comparison_description = re.sub(r"[^0-9a-z가-힣]", "", comparable_description.casefold())
     if (
         comparison_description
         and comparison_title.startswith(comparison_description)
@@ -93,9 +90,19 @@ def concise_summary(selected: SelectedArticle) -> str | None:
 
 def _daily_phrase(groups: Mapping[OutputGroup, Sequence[SelectedArticle]]) -> str:
     populated_count = sum(
-        bool(groups.get(group, ())) for group, _label in _GROUP_LABELS
+        any(groups.get(group, ()) for group in section_groups)
+        for section_groups, _label, _emoji in _SECTIONS
     )
     return _FLOW_PHRASES[min(populated_count, len(_FLOW_PHRASES) - 1)]
+
+
+def _section_items(
+    groups: Mapping[OutputGroup, Sequence[SelectedArticle]],
+    section_groups: tuple[OutputGroup, ...],
+) -> tuple[SelectedArticle, ...]:
+    return tuple(item for group in section_groups for item in groups.get(group, ()))[
+        :MAX_ARTICLES_PER_GROUP
+    ]
 
 
 def render_briefing_html(
@@ -106,18 +113,22 @@ def render_briefing_html(
     run_date = _kst_date(run_at)
     header = (
         f"💡{run_date:%y}년 {run_date.month}월 {run_date.day}일"
-        f"({_WEEKDAYS[run_date.weekday()]}) 육군 브리핑"
+        f"({_WEEKDAYS[run_date.weekday()]}) 언론 모니터링 결과"
     )
     phrase = _daily_phrase(groups)
-    empty_labels = [label for group, label in _GROUP_LABELS if not groups.get(group, ())]
+    empty_labels = [
+        label
+        for section_groups, label, _emoji in _SECTIONS
+        if not _section_items(groups, section_groups)
+    ]
     blocks: list[str] = []
     if empty_labels:
         blocks.append(f"※ {', '.join(empty_labels)} 관련 보도 없음")
-    for group, label in _GROUP_LABELS:
-        items = groups.get(group, ())
+    for section_groups, label, emoji in _SECTIONS:
+        items = _section_items(groups, section_groups)
         if not items:
             continue
-        item_lines = [f"[{label}]"]
+        item_lines = [f"{emoji} [{label}]"]
         for number, selected in enumerate(items, start=1):
             article = selected.article
             title = escape(_normalized_text(article.title))
@@ -132,4 +143,4 @@ def render_briefing_html(
             )
         blocks.append("\n".join(item_lines))
     body = "\n\n".join(blocks)
-    return f"{header}\n💬오늘의 한마디 : {escape(phrase)}" + (f"\n\n{body}" if body else "")
+    return f"{header}\n\n💬오늘의 한마디 : {escape(phrase)}" + (f"\n\n{body}" if body else "")

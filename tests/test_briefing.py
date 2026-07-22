@@ -111,20 +111,20 @@ def test_renderer_uses_final_digest_template_and_escapes_dynamic_html() -> None:
         datetime(2026, 7, 18, 21, 30, tzinfo=UTC),
     )
 
-    assert html.startswith("💡26년 7월 19일(일) 육군 브리핑\n")
-    assert "※ 육군, 군단, 국방·안보, 칼럼·사설 관련 보도 없음" in html
-    assert html.index("[사단]") < html.index("[지역]")
-    assert html.index("[지역]") < html.index("[외교·북한]")
+    assert html.startswith("💡26년 7월 19일(일) 언론 모니터링 결과\n\n")
+    assert "※ 육군, 국방·안보, 칼럼·사설 관련 보도 없음" in html
+    assert html.index("📍 [지역]") < html.index("🎖️ [군단·사단]")
+    assert html.index("🎖️ [군단·사단]") < html.index("🌐 [외교·북한]")
     assert (
-        "[사단]\n"
+        "🎖️ [군단·사단]\n"
         "1. 8사단 &lt;안전&gt; 점검 &amp; 교육 (공식 &amp; 뉴스)\n"
         '<a href="https://news.example/a?x=1&amp;unsafe=&quot;yes&quot;">'
         "기사 링크 바로가기</a>\n"
         "2. 8사단 추가 소식 (공식 &amp; 뉴스)"
     ) in html
-    assert "[지역]\n1. 양주 산불 대응" in html
+    assert "📍 [지역]\n1. 양주 산불 대응" in html
     assert "2. 동두천 협력 소식" in html
-    assert "[외교·북한]\n1. 북한 군사 동향" in html
+    assert "🌐 [외교·북한]\n1. 북한 군사 동향" in html
     assert "첫 문장에 &lt;점검&gt; 사실이 있다." not in html
     assert split_html_message(html)
 
@@ -135,8 +135,8 @@ def test_renderer_header_uses_short_kst_date_and_weekday() -> None:
     monday = render_briefing_html({}, datetime(2026, 7, 19, 21, 30, tzinfo=UTC))
 
     assert sunday == sunday_rerun
-    assert sunday.startswith("💡26년 7월 19일(일) 육군 브리핑")
-    assert monday.startswith("💡26년 7월 20일(월) 육군 브리핑")
+    assert sunday.startswith("💡26년 7월 19일(일) 언론 모니터링 결과")
+    assert monday.startswith("💡26년 7월 20일(월) 언론 모니터링 결과")
     assert "💬오늘의 한마디 : " in monday
 
 
@@ -160,8 +160,8 @@ def test_renderer_omits_summary_when_description_only_repeats_title_and_source()
 def test_renderer_combines_empty_groups_in_notice() -> None:
     html = render_briefing_html({}, datetime(2026, 7, 19, 6, tzinfo=KST))
 
-    assert html.startswith("💡26년 7월 19일(일) 육군 브리핑\n💬오늘의 한마디 : ")
-    assert "※ 육군, 군단, 사단, 지역, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음" in html
+    assert html.startswith("💡26년 7월 19일(일) 언론 모니터링 결과\n\n💬오늘의 한마디 : ")
+    assert "※ 지역, 육군, 군단·사단, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음" in html
 
 
 def test_renderer_uses_requested_date_and_flow_phrase() -> None:
@@ -177,15 +177,18 @@ def test_renderer_uses_requested_date_and_flow_phrase() -> None:
     html = render_briefing_html(groups, datetime(2026, 7, 22, 8, tzinfo=KST))
     empty_html = render_briefing_html({}, datetime(2026, 7, 22, 8, tzinfo=KST))
     lines = html.splitlines()
-    phrase = lines[1].split(" : ", 1)[1]
-    empty_phrase = empty_html.splitlines()[1].split(" : ", 1)[1]
+    phrase = lines[2].split(" : ", 1)[1]
+    empty_phrase = empty_html.splitlines()[2].split(" : ", 1)[1]
 
-    assert lines[0] == "💡26년 7월 22일(수) 육군 브리핑"
-    assert lines[1].startswith("💬오늘의 한마디 : ")
+    assert lines[0] == "💡26년 7월 22일(수) 언론 모니터링 결과"
+    assert lines[1] == ""
+    assert lines[2].startswith("💬오늘의 한마디 : ")
     assert 0 < len(phrase) <= 30
-    rerun_phrase = render_briefing_html(
-        groups, datetime(2026, 7, 22, 8, tzinfo=KST)
-    ).splitlines()[1].split(" : ", 1)[1]
+    rerun_phrase = (
+        render_briefing_html(groups, datetime(2026, 7, 22, 8, tzinfo=KST))
+        .splitlines()[2]
+        .split(" : ", 1)[1]
+    )
     assert phrase == rerun_phrase
     assert phrase != empty_phrase
     assert "8사단 훈련 소식" not in phrase
@@ -216,25 +219,24 @@ def test_renderer_groups_items_in_order_with_local_numbering() -> None:
         ),
     }
     labels = (
-        (OutputGroup.ARMY, "육군", 1),
-        (OutputGroup.CORPS, "군단", 2),
-        (OutputGroup.DIVISION, "사단", 1),
-        (OutputGroup.REGION, "지역", 2),
-        (OutputGroup.DEFENSE_SECURITY, "국방·안보", 2),
-        (OutputGroup.DIPLOMACY_NORTH_KOREA, "외교·북한", 1),
-        (OutputGroup.COLUMN_EDITORIAL, "칼럼·사설", 2),
+        ("📍", "지역", 2),
+        ("🪖", "육군", 1),
+        ("🎖️", "군단·사단", 3),
+        ("🛡️", "국방·안보", 2),
+        ("🌐", "외교·북한", 1),
+        ("📰", "칼럼·사설", 2),
     )
 
     html = render_briefing_html(groups, datetime(2026, 7, 22, 8, tzinfo=KST))
-    positions = [html.index(f"[{label}]") for _group, label, _count in labels]
+    positions = [html.index(f"{emoji} [{label}]") for emoji, label, _count in labels]
 
     assert positions == sorted(positions)
-    for _group, label, count in labels:
-        start = html.index(f"[{label}]")
+    for emoji, label, count in labels:
+        start = html.index(f"{emoji} [{label}]")
         next_positions = [position for position in positions if position > start]
         end = min(next_positions, default=len(html))
         block = html[start:end]
-        assert block.count(f"[{label}]") == 1
+        assert block.count(f"{emoji} [{label}]") == 1
         for number in range(1, count + 1):
             assert f"\n{number}. " in block
         assert f"\n{count + 1}. " not in block
@@ -253,17 +255,16 @@ def test_renderer_combines_empty_notice_omits_empty_headers_and_summaries() -> N
         datetime(2026, 7, 22, 8, tzinfo=KST),
     )
 
-    notice = "※ 육군, 군단, 지역, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음"
-    assert html.index(notice) < html.index("[사단]")
-    assert "[군단]" not in html
-    assert "[지역]" not in html
-    assert "[육군]" not in html
-    assert "[국방·안보]" not in html
-    assert "[외교·북한]" not in html
-    assert "[칼럼·사설]" not in html
+    notice = "※ 지역, 육군, 국방·안보, 외교·북한, 칼럼·사설 관련 보도 없음"
+    assert html.index(notice) < html.index("🎖️ [군단·사단]")
+    assert "📍 [지역]" not in html
+    assert "🪖 [육군]" not in html
+    assert "🛡️ [국방·안보]" not in html
+    assert "🌐 [외교·북한]" not in html
+    assert "📰 [칼럼·사설]" not in html
     assert "이 설명은 링크 아래에 절대 표시하지 않습니다." not in html
     assert "\n- " not in html
-    assert "[사단]\n1. 사단 제목 (공식 &amp; 뉴스)" in html
+    assert "🎖️ [군단·사단]\n1. 사단 제목 (공식 &amp; 뉴스)" in html
 
 
 def test_renderer_escapes_dynamic_html_and_is_telegram_split_compatible() -> None:
